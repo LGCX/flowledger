@@ -1126,7 +1126,42 @@ amount, which is why the money lint rule is scoped to `money.ts`/`fees.ts` rathe
 The scoping question raised at P01-T01 is therefore resolved by evidence: `payment.ts` would fail a
 blanket rule while being correct.
 
-**Next task:** `P01-T08`.
+## P01-T08 — Command acceptance guards and effects
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T09.
+
+```text
+TASK P01-T08 — NEEDS-REVIEW
+Acceptance criteria:
+  - every expected-behaviour case asserts code AND reason -> met; the refund race loser is proven to
+    fail on MONETARY_GUARD_FAILED/REFUND_EXCEEDS_REFUNDABLE
+  - checkPaymentInvariants(next, [...ops, operation]) is [] after every success -> met, as a
+    tabulated property over 5 valid prior states x 5 requests (25 cases) plus a check that every
+    prior state is itself valid
+  - inputs are deep-equal before and after every call -> met
+Tests added: packages/domain/src/commands.test.ts (54)
+  break-and-restore (each observed failing, then restored):
+    refund monetary guard removed (handoff) -> race-loser case and two invariant properties fail
+    unresolved-refund guard removed         -> the exclusion case fails
+    exclusive-pointer guard removed         -> the refund-blocked case fails
+    authorization attempt cap removed       -> the fourth-attempt case fails
+    capture minimum check removed           -> the below-minimum case fails
+    baseline after restore                  -> 54 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. Added `blocksExclusiveCommands(ops)`, a read-only helper for consumers that need to know
+     whether to wait; not used by the guards themselves.
+  2. The refund `feeSnapshot` is copied (`Object.freeze({...})`) rather than taken by reference. The
+     task says "copied"; the first implementation aliased it and the test caught it.
+Contract/plan issues found: none.
+Next task: P01-T09.
+```
+
+**Two self-inflicted defects caught before commit:** a guard that could never fire
+(`exclusionClass(type) === 'EXCLUSIVE' && isRefund`) with a comment contradicting itself, and the
+aliased snapshot above. Both were removed rather than patched.
+
+**Next task:** `P01-T09`.
 
 
 
