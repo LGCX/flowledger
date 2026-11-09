@@ -797,7 +797,57 @@ Next task: P00-GATE.
 finding — a green result that proves nothing — and it would have been invisible in a CI log,
 because the job would simply have said "no tests found" and passed.
 
-**Next task:** `P00-GATE`.
+## P00-GATE — M0 milestone verification
+
+**Status:** `NEEDS-REVIEW` — all six acceptance criteria and four artifacts are evidenced
+locally. One M0 expectation has no evidence yet: no GitHub Actions run has been observed,
+because this clone had no git remote when the gate ran. The remote exists now and the first
+push is pending owner approval.
+
+```text
+TASK P00-GATE — NEEDS-REVIEW
+Acceptance criteria:
+  - all six docs/10 §M0 acceptance bullets map to a passing test or recorded command -> met,
+    see docs/evidence/P00.md
+  - all four M0 artifacts exist -> met (DEVELOPMENT.md, two-job CI, VERSIONS.md + lockfile,
+    contract report artifact)
+  - clean-clone run recorded with commit SHA -> met, transcript in docs/evidence/P00.md
+Tests added: test/contract/m0-gate.test.ts (8)
+  break-and-restore (each observed failing, then restored):
+    vitest list result discarded        -> all three project cases fail (passWithNoTests loophole)
+    duplicate registry row injected     -> gate registry case and the message-field case fail
+    undocumented env var planted in apps/api/src -> secret-documentation case fails
+    baseline after restore              -> 8 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+  clean clone of 8ef8fbd: install 2s, check 14s, integration 5s, e2e 1s, performance 0s,
+    db:up 6s (all three services healthy), db:down 11s (volume and network removed)
+  live: pubsub 8085 -> 200, jaeger 16686 -> 200, otlp 4318 POST -> 415
+Deviations from the task text:
+  1. `createMessageAjv` takes no injected schema list, so the malformed-schema case compiles the
+     mutated schema with `createAjv()` under the same `strictSchema` settings. Same rejection,
+     no API change invented for a test.
+  2. The P00-T09 OpenAPI example walker is private to `openapi.test.ts`, and this task may only
+     create `m0-gate.test.ts`, so a compact equivalent lives here. Two walkers is a real cost;
+     the alternative was modifying a file the task forbids.
+  3. Clean-clone transcript was captured on `8ef8fbd`, the parent of this commit: a commit cannot
+     contain a transcript of verifying itself. The same sequence was re-run against the P00-GATE
+     commit afterwards and reported here; `pnpm check` includes the gate cases from then on.
+  4. `corepack enable` was not run inside the clone (it writes into the Node installation, which
+     is read-only here); the clone used the already-active pinned pnpm 10.34.9.
+  5. Terraform version is listed in docs/10 §M0 as an artifact to record, but no Terraform exists
+     before the deployment phase. Recorded as a deferred gap in docs/evidence/P00.md rather than
+     inventing a version.
+Contract/plan issues found: M0 says "record the supported ... Terraform versions"; there is no
+  Terraform to version at M0. Listed as a known gap.
+Next task: P01-T01.
+```
+
+**One break proved nothing, again.** Weakening the registry assertion to `length >= 0` kept every
+test green, because the real registry has no findings — the assertion had nothing to fail on. The
+meaningful break injects a duplicate row into the generated registry, which failed two cases. The
+pattern is consistent: a break must change the *input*, not the assertion.
+
+**Next task:** `P01-T01`.
 
 
 
