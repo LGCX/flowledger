@@ -982,7 +982,45 @@ So the pattern is a pre-filter and the round-trip is authoritative; equality imp
 Both are kept because the task requires both, but only the round-trip is independently observable.
 Recorded rather than claiming a fifth break.
 
-**Next task:** `P01-T04`.
+## P01-T04 — Capture fee and cumulative refund-fee reversal
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T05.
+
+```text
+TASK P01-T04 — NEEDS-REVIEW
+Acceptance criteria:
+  - every golden row asserted from the JSON files, not duplicated literals -> met (14 capture,
+    3 minimum, 10 refund rows; each file also asserts its own row count so a truncated file fails)
+  - properties pass at the CI seed and 1000 runs locally -> met (FC_NUM_RUNS=1000)
+  - no floating point in fees.ts -> met; the P00-T02 money rule covers fees.ts and lint passes
+Tests added: packages/domain/src/fees.test.ts (46), golden/capture-fee.v1.json,
+             golden/refund-fee.v1.json
+  break-and-restore (each observed failing, then restored):
+    ROUNDING_OFFSET 5000 -> 4999        -> exact-half and fixed-plus-half fail (handoff item)
+    refund floor -> ceiling             -> thirds, order-a, order-b, ten-singles fail (handoff item)
+    policy minimum-coverage rule removed -> 3 policy cases fail (the D-07/R-12 rule)
+    overflow check removed               -> the overflow vector fails
+    fee > gross check removed            -> the fee-greater-than-gross vector and its property fail
+    baseline after restore               -> 46 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `computePercentageFee` is exported additionally, so the golden file's `percentageFee` column
+     can be asserted without recomputing the fee. Without it the column would be decorative.
+  2. `incrementalFeeReversal` reports a refund below 1 as FEE_SNAPSHOT_INVALID rather than
+     REFUND_EXCEEDS_CAPTURE. The task groups "a >= 1" and "R1 <= G" under one error, but a zero
+     refund does not exceed the capture and naming it so would misdirect. Untested by the golden
+     vectors, which never pass a non-positive refund.
+Contract/plan issues found: none.
+Next task: P01-T05.
+```
+
+**One self-inflicted error caught by the suite:** the first version of the policy table listed
+"bp 290 / fixed 30 / minimum 31 rejected" among the rejected cases. Under D-07 that policy is
+*accepted* — `F(31) = 1 + 30 = 31 <= 31` — and the golden vectors say so. The test failed, the
+implementation was right, and the row was moved to the accepted table. Worth recording because the
+failure looked like an implementation bug and was a transcription bug.
+
+**Next task:** `P01-T05`.
 
 
 

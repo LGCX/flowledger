@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "description": "Capture-fee vectors from docs/02 §Capture-fee calculation. Amounts are decimal strings; basisPoints is a string because it is a bigint. A row with an 'error' key must throw the named DomainError reason.",
+  "vectors": [
+    {
+      "id": "below-half",
+      "gross": "8003",
+      "basisPoints": "333",
+      "fixedAmount": "0",
+      "percentageFee": "266",
+      "fee": "266"
+    },
+    {
+      "id": "exact-half",
+      "gross": "5000",
+      "basisPoints": "333",
+      "fixedAmount": "0",
+      "percentageFee": "167",
+      "fee": "167"
+    },
+    {
+      "id": "above-half",
+      "gross": "1997",
+      "basisPoints": "333",
+      "fixedAmount": "0",
+      "percentageFee": "67",
+      "fee": "67"
+    },
+    {
+      "id": "docs-example",
+      "gross": "10000",
+      "basisPoints": "300",
+      "fixedAmount": "0",
+      "percentageFee": "300",
+      "fee": "300"
+    },
+    {
+      "id": "fixed-plus-percentage",
+      "gross": "10000",
+      "basisPoints": "290",
+      "fixedAmount": "30",
+      "percentageFee": "290",
+      "fee": "320"
+    },
+    {
+      "id": "fixed-plus-half",
+      "gross": "5000",
+      "basisPoints": "333",
+      "fixedAmount": "25",
+      "percentageFee": "167",
+      "fee": "192"
+    },
+    {
+      "id": "zero-fee",
+      "gross": "10000",
+      "basisPoints": "0",
+      "fixedAmount": "0",
+      "percentageFee": "0",
+      "fee": "0"
+    },
+    {
+      "id": "fee-equals-gross-fixed",
+      "gross": "30",
+      "basisPoints": "0",
+      "fixedAmount": "30",
+      "percentageFee": "0",
+      "fee": "30"
+    },
+    {
+      "id": "fee-equals-gross-percentage",
+      "gross": "1000000000000",
+      "basisPoints": "10000",
+      "fixedAmount": "0",
+      "percentageFee": "1000000000000",
+      "fee": "1000000000000"
+    },
+    {
+      "id": "max-gross-typical",
+      "gross": "1000000000000",
+      "basisPoints": "290",
+      "fixedAmount": "30",
+      "percentageFee": "29000000000",
+      "fee": "29000000030"
+    },
+    {
+      "id": "fee-greater-than-gross",
+      "gross": "29",
+      "basisPoints": "0",
+      "fixedAmount": "30",
+      "error": "FEE_EXCEEDS_GROSS"
+    },
+    {
+      "id": "overflow",
+      "gross": "1000000000000",
+      "basisPoints": "10000",
+      "fixedAmount": "1",
+      "error": "AMOUNT_OVERFLOW"
+    },
+    {
+      "id": "basis-points-above-10000",
+      "gross": "100",
+      "basisPoints": "10001",
+      "fixedAmount": "0",
+      "error": "FEE_POLICY_INVALID"
+    },
+    {
+      "id": "gross-zero",
+      "gross": "0",
+      "basisPoints": "290",
+      "fixedAmount": "30",
+      "error": "GROSS_INVALID"
+    }
+  ],
+  "minimumCaptureVectors": [
+    { "id": "at-minimum", "gross": "30", "minimum": "30", "ok": true },
+    { "id": "above-minimum", "gross": "31", "minimum": "30", "ok": true },
+    {
+      "id": "below-minimum",
+      "gross": "29",
+      "minimum": "30",
+      "error": "BELOW_MINIMUM_CAPTURE",
+      "detailMinimumAmountMinor": "30"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "description": "Refund-fee reversal vectors from docs/02 §Refund accounting. Refunds are listed in confirmation order and each 'increments' entry is the reversal attributed to that refund. A row may carry 'thenRefund' + 'error' for a refund that must be rejected. P07's PostgreSQL refund confirmation reuses this file.",
+  "vectors": [
+    {
+      "id": "docs-example",
+      "captureFee": "300",
+      "captureGross": "10000",
+      "refunds": ["5000"],
+      "increments": ["150"]
+    },
+    {
+      "id": "thirds",
+      "captureFee": "320",
+      "captureGross": "10000",
+      "refunds": ["3333", "3333", "3334"],
+      "increments": ["106", "107", "107"]
+    },
+    {
+      "id": "order-a",
+      "captureFee": "7",
+      "captureGross": "10",
+      "refunds": ["3", "3", "4"],
+      "increments": ["2", "2", "3"]
+    },
+    {
+      "id": "order-b",
+      "captureFee": "7",
+      "captureGross": "10",
+      "refunds": ["4", "3", "3"],
+      "increments": ["2", "2", "3"]
+    },
+    {
+      "id": "ten-singles",
+      "captureFee": "7",
+      "captureGross": "10",
+      "refunds": ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1"],
+      "increments": ["0", "1", "1", "0", "1", "1", "0", "1", "1", "1"]
+    },
+    {
+      "id": "fee-equals-gross",
+      "captureFee": "30",
+      "captureGross": "30",
+      "refunds": ["10", "20"],
+      "increments": ["10", "20"]
+    },
+    {
+      "id": "zero-fee",
+      "captureFee": "0",
+      "captureGross": "5000",
+      "refunds": ["2500", "2500"],
+      "increments": ["0", "0"]
+    },
+    {
+      "id": "max-values",
+      "captureFee": "1000000000000",
+      "captureGross": "1000000000000",
+      "refunds": ["1", "999999999999"],
+      "increments": ["1", "999999999999"]
+    },
+    {
+      "id": "rejected-refund-skipped",
+      "captureFee": "320",
+      "captureGross": "10000",
+      "refunds": ["2500", "7500"],
+      "increments": ["80", "240"]
+    },
+    {
+      "id": "exceeds-capture",
+      "captureFee": "320",
+      "captureGross": "10000",
+      "refunds": ["6000"],
+      "increments": ["192"],
+      "thenRefund": "4001",
+      "error": "REFUND_EXCEEDS_CAPTURE"
+    }
+  ]
+}
