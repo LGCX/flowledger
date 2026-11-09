@@ -349,7 +349,8 @@ This is the endpoint that makes the system's behavior inspectable without databa
         "resolutionSource": "RECONCILIATION"
       }
     }
-  ]
+  ],
+  "truncated": false
 }
 ```
 
