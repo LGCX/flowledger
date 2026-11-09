@@ -104,5 +104,61 @@ commit.
 
 No blocking items remain before `P00-T01`.
 
-**Next task:** `P00-T01` — Workspace, toolchain pins, project references, and test
-projects. Dependencies: none. Step 1 approved and merged.
+**Next task:** `P00-T01`.
+
+---
+
+## P00-T01 — Workspace, toolchain pins, project references, and test projects
+
+**Status:** `NEEDS-REVIEW` — all gates green, awaiting owner approval before P00-T02.
+
+```text
+TASK P00-T01 — NEEDS-REVIEW
+Commit: 430e860 on task/p00-t01-workspace-toolchain
+Acceptance criteria:
+  - every dep spec exact or workspace:* -> met (9 manifests, 0 non-exact specs)
+  - packageManager/engines.node/.nvmrc agree and recorded in docs/VERSIONS.md -> met
+    (.nvmrc 24.22.1 = engines.node 24.22.1; packageManager pnpm@10.34.9)
+  - tsc -b succeeds with the step-5 strict flags -> met (and proven able to fail:
+    a `const bad: number = "s"` in a package source yields TS2322)
+  - vitest.config.ts defines exactly unit/contracts/integration/e2e/chaos with the
+    CONVENTIONS §4 globs -> met; each of the five resolves via `--project <name>`
+  - pnpm check exits 0; pnpm lint does not touch contract files -> met
+Tests added: none — the task states "No test files in this task".
+  Break-and-restore proof instead (all restored):
+    1. strict-mode violation in packages/domain/src/index.ts -> tsc -b exit 1 (TS2322)
+    2. prettier spec `^3.9.10` -> install exit 1 (ERR_PNPM_OUTDATED_LOCKFILE)
+    3. vitest project renamed -> `--project chaos` exit 1
+    4. .prettierignore entry removed -> prettier exit 1 on 17 plan files
+Commands: pnpm install --frozen-lockfile -> 0
+          pnpm check -> 0 (lint 0, typecheck 0, test:unit 0 "no test files",
+                           test:contracts 0 "no test files")
+          pnpm test:integration -> 0 | pnpm test:e2e -> 0
+          clean clone (/tmp): install --frozen-lockfile 0, check 0,
+                              test:integration 0, test:e2e 0
+Deviations from the task text:
+  1. .prettierignore extended with docs/10-IMPLEMENTATION_PLAN.md, docs/execution-plan,
+     .pnpm-store, .reasonix. `prettier --check .` covers Markdown; without these the
+     gate fails on 187 files and the only other fix is `prettier --write`, which would
+     reformat docs/10 and the binding plan — forbidden (contracts change only in
+     owner-approved commits). Break 4 above is the evidence that these entries are
+     load-bearing.
+  2. .gitignore merges the task's required entries with the four already present
+     (*.log, .env.*, !.env.example) and adds .pnpm-store/.
+  3. `test/tsconfig.json` builds cleanly with no test files, contrary to my pre-flight
+     concern about TS18003; verified `tsc -p test/tsconfig.json` exits 0, so no
+     placeholder file was added.
+Contract/plan issues found: none.
+Next task: P00-T02 (dependencies satisfied: yes — P00-T01).
+```
+
+**Environment note (not a task deviation).** Node 24.22.1 and pnpm 10.34.9 were not
+installed on this machine, and `~/.nvm/versions/node` is not writable by the agent
+sandbox (`Operation not permitted`), so nvm could not install the pinned Node. The
+gates were run against a sandbox-local extract of the official
+`node-v24.22.1-darwin-arm64` tarball (`/tmp/fl-node24`) with Corepack providing
+pnpm 10.34.9 from `packageManager`. Nothing on the host was modified. On a normal
+machine `nvm install && corepack enable` reproduces this exactly; `.nvmrc` and
+`engines.node` pin it either way.
+
+**Next task:** `P00-T02`, after owner approval.
