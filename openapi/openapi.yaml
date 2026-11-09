@@ -978,7 +978,7 @@ components:
           description: >-
             Opaque provider-issued sandbox token. Raw card or bank credentials
             are prohibited.
-          examples: [pm_sandbox_123]
+          examples: [pm_fake_approveDemo]
         provider:
           $ref: '#/components/schemas/ProviderName'
     EmptyRequest:

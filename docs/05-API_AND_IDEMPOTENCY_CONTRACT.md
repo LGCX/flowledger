@@ -178,7 +178,7 @@ Content-Type: application/json
     "amountMinor": "10000",
     "currency": "USD"
   },
-  "paymentMethodRef": "pm_sandbox_123",
+  "paymentMethodRef": "pm_fake_approveDemo",
   "provider": "fake-provider"
 }
 ```
