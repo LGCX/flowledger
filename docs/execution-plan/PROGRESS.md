@@ -598,7 +598,46 @@ Next task: P00-T11.
 2. Fixtures satisfy P00-T11's correlational rules as well as the schemas, so "valid" here
    means valid for the whole pipeline, not just Ajv.
 
-**Next task:** `P00-T11`.
+## P00-T11 — Post-schema semantic correlation validator
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P00-T12.
+
+```text
+TASK P00-T11 — NEEDS-REVIEW
+Commit: 037e1e9 on task/p00-t11-semantic
+Acceptance criteria:
+  - every rule has a fixture that passes Ajv and fails exactly that rule -> met (16/16)
+  - all 26 positive fixtures produce zero violations -> met
+  - deferred checks listed with owner phases -> met (module header: P05, P07, P08, P09)
+  - commands and settlement events rejected by assertContiguityApplicable -> met
+Tests added: semantic.test.ts (51), envelope.test.ts (7),
+             fixtures/semantic-mismatches.ts (16 cases)
+  break-and-restore: each of the 16 rules disabled in turn, its own case observed failing,
+  then restored. Totals boundary cases also failed when the totals check was removed.
+  baseline after restore -> 58 passing
+Commands: pnpm check 0 | integration 0 (7 tests) | e2e 0 | build 0
+          contract lane: 13 files, 538 tests
+          clean clone: install 0, check 0, build 0
+Deviations from the task text:
+  1. Four mismatches are `viaSchema: false` and call `checkSemantics` directly, as the task
+     anticipated; each such case ALSO asserts `validateMessage` rejects the input, so it
+     cannot pass while the semantic rule is unreachable.
+  2. `EnvelopeInput` omits `id` from the generated envelope type rather than requiring it,
+     so the "no id generated" behaviour is expressible in the type system and its absence
+     is a validation failure rather than a compile error. `UNREGISTERED_TYPE` maps to
+     `failure: 'SCHEMA'` for producers: an unregistered type is a programming error at the
+     producer, not a routing decision.
+Contract/plan issues found: none.
+Next task: P00-T12.
+```
+
+**Note worth keeping:** the rule
+`TOTALS_SATISFY_PAYMENT_INVARIANTS` can emit two violations for one mutation (for example a
+`captured` above `authorized` also makes `voided > authorized - captured`). The test compares
+*distinct* rule names, so the intended rule is still asserted exactly rather than by count.
+
+**Next task:** `P00-T12`.
+
 
 
 
