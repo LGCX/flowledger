@@ -1,0 +1,36 @@
+{
+  "approved": [
+    "@nestjs/core",
+    "@nestjs/common",
+    "@nestjs/platform-fastify",
+    "fastify",
+    "reflect-metadata",
+    "rxjs",
+    "pg",
+    "@types/pg",
+    "ajv",
+    "ajv-formats",
+    "@apidevtools/swagger-parser",
+    "openapi-typescript",
+    "json-schema-to-typescript",
+    "ulid",
+    "pino",
+    "@opentelemetry/api",
+    "@opentelemetry/sdk-node",
+    "@opentelemetry/auto-instrumentations-node",
+    "@google-cloud/pubsub",
+    "vitest",
+    "fast-check",
+    "@testcontainers/postgresql",
+    "testcontainers",
+    "eslint",
+    "typescript-eslint",
+    "prettier"
+  ],
+  "approvedPatterns": ["@opentelemetry/exporter-"],
+  "justified": {
+    "typescript": "compiler",
+    "@types/node": "Node typings",
+    "@eslint/js": "ESLint recommended config"
+  }
+}
