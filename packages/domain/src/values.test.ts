@@ -153,6 +153,10 @@ describe('toTimestamp', () => {
         fc.date({
           min: new Date('1970-01-01T00:00:00.000Z'),
           max: new Date('9999-12-31T23:59:59.999Z'),
+          // `fc.date` can emit Invalid Date unless told otherwise. `toTimestamp` rightly throws on
+          // one (a programmer error, not client input), so an invalid date is not a case this
+          // property is about.
+          noInvalidDate: true,
         }),
         (date) => {
           const rendered = toTimestamp(date);
@@ -171,6 +175,10 @@ describe('toTimestamp', () => {
         fc.date({
           min: new Date('1970-01-01T00:00:00.000Z'),
           max: new Date('9999-12-31T23:59:59.999Z'),
+          // `fc.date` can emit Invalid Date unless told otherwise. `toTimestamp` rightly throws on
+          // one (a programmer error, not client input), so an invalid date is not a case this
+          // property is about.
+          noInvalidDate: true,
         }),
         (date) => {
           const rendered = toTimestamp(date);
