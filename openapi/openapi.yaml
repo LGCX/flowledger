@@ -1431,6 +1431,7 @@ components:
         - $ref: '#/components/schemas/Problem412'
         - $ref: '#/components/schemas/Problem413'
         - $ref: '#/components/schemas/Problem415'
+        - $ref: '#/components/schemas/Problem422'
         - $ref: '#/components/schemas/Problem429'
         - $ref: '#/components/schemas/Problem500'
         - $ref: '#/components/schemas/Problem503'
