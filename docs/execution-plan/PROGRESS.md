@@ -847,6 +847,24 @@ test green, because the real registry has no findings — the assertion had noth
 meaningful break injects a duplicate row into the generated registry, which failed two cases. The
 pattern is consistent: a break must change the *input*, not the assertion.
 
+### P00-GATE closure — CI evidence
+
+**Status:** `DONE` for the CI-observation item that was the only open `NEEDS-REVIEW` reason.
+
+```text
+First run on main (42577239084):  fast FAILED at the secret scan; integration skipped
+  -> three generic-api-key findings, all in the baseline commit's contract docs:
+     `"orderingKey": "pay_..."` (docs/04:47,204) and `Idempotency-Key: 0192f4e7-...` (docs/05:171).
+  -> resolved by allowlisting identifier SHAPES (entity ID, UUID), not the contract files, so both
+     documents stay scanned. Verified the scanner still catches a planted GitHub PAT, AWS key, and
+     generic API key (3 findings, exit 1).
+  -> first attempt at that verification used `AKIAIOSFODNN7EXAMPLE`, which gitleaks ignorelists as
+     AWS's published sample; the check passed for the wrong reason until the values were replaced.
+
+Green run 42577539550 (13c31dc):  fast success, integration success
+Red run   42577747019 (df4a5fa):  fast FAILED at `lint`, integration SKIPPED (branch deleted after)
+```
+
 **Next task:** `P01-T01`.
 
 
