@@ -1489,7 +1489,41 @@ Contract/plan issues found: none.
 Next task: P02-T04.
 ```
 
-**Next task:** `P02-T04`.
+## P02-T04 — API credential scheme (pure domain)
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T05.
+
+```text
+TASK P02-T04 — NEEDS-REVIEW
+Acceptance criteria:
+  - golden vector checked in (pepper v1 = 0x00..0x1f) -> met,
+    digest hex b44c76693fafbe566bd7ad0e4de7b6eba736c0c82e24bb84e080c4b87eb9638e,
+    recomputed independently with Python hmac/hashlib before the implementation was trusted
+  - timingSafeEqual used; no === on digests -> met, asserted against the module source text
+  - no credential or pepper value in any thrown error -> met, asserted on message content
+Tests added: packages/domain/src/credentials.test.ts (39)
+  break-and-restore (each observed failing, then restored):
+    timingSafeEqual -> Buffer.equals          -> the structural case fails
+    locator alphabet widened to include I/L/O/U -> 3 cases fail
+    digest covers only the secret             -> the golden vector and the locator case fail
+    unknown version falls back to current pepper -> the unknown-version case fails
+    duplicate versions accepted               -> that case fails
+    digest length check removed               -> the 31/33-byte case fails
+    baseline after restore                    -> 39 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `packages/domain/src/ids.ts` was NOT modified: all five prefixes the task asks for (mcr, pac, pwe,
+     fee, pev) already exist from P01-T02 and contract fix 1. The [ASSUMPTION] about them being absent
+     from the schema no longer holds — they are in entity-ids.v1.schema.json as DB-only $defs, so the
+     P01-GATE prefix parity test covers them.
+  2. The "no === on digests" criterion is asserted by reading the module source. A timing-based test
+     would be flaky, and the first version of this test only checked that `timingSafeEqual` is a
+     function, which proved nothing.
+Contract/plan issues found: none.
+Next task: P02-T05.
+```
+
+**Next task:** `P02-T05`.
 
 
 
