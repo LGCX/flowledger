@@ -1523,6 +1523,24 @@ Contract/plan issues found: none.
 Next task: P02-T05.
 ```
 
+## CI repairs after P02-T02 … P02-T04
+
+Two red CI runs were caused by the P02 work, both fixed on their own branches and merged:
+
+| Commit | Symptom | Fix |
+| --- | --- | --- |
+| `381110f` | `test/contract/m0-gate.test.ts` "project runs at least one test file" timed out at 5 s in CI (passed locally at ~3.6 s) | explicit 60 s timeout; the assertion is about config, not runner speed |
+| `942ae18` | `gitleaks`: 3 `generic-api-key` findings in `credentials.test.ts` | allowlist the constant placeholder locator `0123456789AB`, **not** the `fl_test_*` shape |
+
+The second one is the one worth keeping: allowlisting the `fl_test_<12>_<43>` shape would have blinded the
+secret scan to a real leaked merchant credential. Verified both directions — history scan clean, and a
+freshly generated `fl_test_<random>_<random>` in a temp dir is still flagged (exit 1,
+`generic-api-key`).
+
+**Process gap:** local gates do not include the secret scan, so the first signal for that class of
+problem is always a red run after pushing. Adding `gitleaks git` to `scripts/verify-task.mjs` would close
+it; not done here because it needs a gitleaks binary on the developer machine.
+
 **Next task:** `P02-T05`.
 
 
