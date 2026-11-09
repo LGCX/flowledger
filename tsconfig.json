@@ -1,14 +1,59 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/config" },
-    { "path": "packages/contracts" },
-    { "path": "packages/domain" },
-    { "path": "packages/database" },
-    { "path": "packages/messaging" },
-    { "path": "packages/providers" },
-    { "path": "packages/observability" },
-    { "path": "packages/testkit" },
-    { "path": "test" }
+    {
+      "path": "packages/config"
+    },
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "packages/database"
+    },
+    {
+      "path": "packages/messaging"
+    },
+    {
+      "path": "packages/providers"
+    },
+    {
+      "path": "packages/observability"
+    },
+    {
+      "path": "packages/testkit"
+    },
+    {
+      "path": "test"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/outbox-relay"
+    },
+    {
+      "path": "apps/payment-worker"
+    },
+    {
+      "path": "apps/provider-webhook-receiver"
+    },
+    {
+      "path": "apps/provider-webhook-worker"
+    },
+    {
+      "path": "apps/reconciler"
+    },
+    {
+      "path": "apps/settlement-worker"
+    },
+    {
+      "path": "apps/merchant-webhook-projector"
+    },
+    {
+      "path": "apps/merchant-webhook-dispatcher"
+    }
   ]
 }

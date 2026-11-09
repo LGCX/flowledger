@@ -38,5 +38,18 @@ first two.
 
 ## Runtime dependencies
 
-None yet. Later tasks add runtime dependencies from the CONVENTIONS §2 approved list, pinned
-exactly, recorded here in the same commit.
+Declared per application in `apps/<app>/package.json`, pinned exactly. Every one is on the
+CONVENTIONS §2 approved list, and `test/contract/dependency-policy.test.ts` fails on any addition
+that is not.
+
+| Package                    | Pinned version | Declared by                               |
+| -------------------------- | -------------- | ----------------------------------------- |
+| `@nestjs/core`             | 11.2.8         | every app (all nine)                      |
+| `@nestjs/common`           | 11.2.8         | every app (all nine)                      |
+| `@nestjs/platform-fastify` | 11.2.8         | `api` only                                |
+| `fastify`                  | 5.12.8         | `api` only                                |
+| `rxjs`                     | 7.8.2          | every app (NestJS peer)                   |
+| `reflect-metadata`         | 0.2.2          | every app (decorator metadata at runtime) |
+
+`@flowledger/config` is a `workspace:*` dependency of every app, and every app is a `workspace:*`
+devDependency of the root so `test/contract/**` can boot it.
