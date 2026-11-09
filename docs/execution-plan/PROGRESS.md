@@ -942,7 +942,47 @@ when the assignment stops being an error (unused directive) and when the directi
 the error remains. Removing the brand made the first case fire, which is the only evidence that the
 branded types are exclusive rather than merely documented as such.
 
-**Next task:** `P01-T03`.
+## P01-T03 — Strict value constructors
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T04.
+
+```text
+TASK P01-T03 — NEEDS-REVIEW
+Acceptance criteria:
+  - each expected-behavior case is a test -> met (44 cases)
+  - error codes match the problem codes -> met (INVALID_REQUEST / INVALID_IDEMPOTENCY_KEY /
+    INVALID_CORRELATION_ID, each asserted individually)
+Tests added: packages/domain/src/values.test.ts (44)
+  break-and-restore (each observed failing, then restored):
+    provider pattern gutted to /^[a-z]/        -> trailing hyphen, 64 chars, underscore fail
+    opaque charset loosened to /^.{16,128}$/   -> space case and charset case fail
+    idempotency reports the generic code       -> 3 cases fail
+    round-trip equality dropped                -> impossible-date and 24:00:00 cases fail
+    timestamp pattern loosened                 -> NO failures (see below)
+    baseline after restore                     -> 44 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text: none.
+Contract/plan issues found: none.
+Next task: P01-T04.
+```
+
+**One break proved nothing, and the reason is worth keeping.** Loosening `TIMESTAMP_SHAPE` to
+accept offsets and variable-length fractions left all 44 tests green. The round-trip check
+(`new Date(s).toISOString() === s`) already rejects those inputs, because `toISOString` always emits
+exactly `.sssZ`; measured directly:
+
+```text
+'2026-11-05T18:44:31Z'            -> 2026-11-05T18:44:31.000Z   equal: false
+'2026-11-05T18:44:31.12Z'         -> 2026-11-05T18:44:31.120Z   equal: false
+'2026-11-05T18:44:31.123+00:00'   -> 2026-11-05T18:44:31.123Z    equal: false
+'2026-11-05 18:44:31.123Z'        -> 2026-11-05T18:44:31.123Z    equal: false
+```
+
+So the pattern is a pre-filter and the round-trip is authoritative; equality implies canonical form.
+Both are kept because the task requires both, but only the round-trip is independently observable.
+Recorded rather than claiming a fifth break.
+
+**Next task:** `P01-T04`.
 
 
 
