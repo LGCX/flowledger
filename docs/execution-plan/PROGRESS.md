@@ -707,7 +707,43 @@ Next task: P00-T13.
 2. A-09 (simulator secret formats) is P06's to extend: `sim_sk_*` and `sim_whsec_*` are matched
    here, and a different P06 format needs a new pattern, not a looser one.
 
-**Next task:** `P00-T13`.
+## P00-T13 — Migration naming and ordering check
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P00-T14.
+
+```text
+TASK P00-T13 — NEEDS-REVIEW
+Acceptance criteria:
+  - real directories produce zero findings -> met (migrations/ holds only .gitkeep;
+    apps/provider-simulator/migrations/ does not exist yet, asserted as clean-or-absent)
+  - each negative list produces exactly one finding of the expected type -> met
+Tests added: test/contract/migration-order.test.ts (11); migrations/.gitkeep
+  break-and-restore (each observed failing, then restored):
+    range check removed          -> both range cases fail
+    duplicate check removed      -> duplicate case fails
+    pattern made permissive      -> three-digit, uppercase, extension cases fail
+    .gitkeep exception removed   -> real-dir and gitkeep cases fail
+    misnamed file planted in migrations/ -> real-dir case fails
+    baseline after restore       -> 11 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `checkMigrationNames` reports an invalid name once and does not run the range/duplicate
+     checks on it, so one typo cannot produce several consequence findings. A test asserts
+     this (`100_x.sql` yields exactly one finding, not a name and a range finding).
+  2. `entries()` reads a directory by attempting `readdirSync` and treating failure as absent,
+     rather than testing existence first; the first version had a `statSync` guard that could
+     not fail and was removed as dead logic.
+Contract/plan issues found: none.
+Next task: P00-T14.
+```
+
+**One break that proved nothing, worth recording:** the first attempt at weakening the name
+check replaced `match?.[1] === undefined` with `match === null`. Those are equivalent — the
+pattern has a mandatory capture group — so all tests still passed. That is exactly the failure
+mode CONVENTIONS §14.4 names (a test that cannot fail is not evidence), and the real break has
+to loosen `MIGRATION_NAME` itself.
+
+**Next task:** `P00-T14`.
 
 
 
