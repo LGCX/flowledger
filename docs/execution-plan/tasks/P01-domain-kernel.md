@@ -325,7 +325,7 @@ with checked `bigint` arithmetic, and lock it with golden vectors and properties
   - `capture-fee golden <id>` for each row; `refund-fee golden <id>` for each row.
   - Property `percentage component is HALF_UP`: for `G ∈ [1, MAX]`, `B ∈ [0, 10000]`, `F - K` equals the unique integer `p` with `|G·B - p·10000| ≤ 5000` and ties (`= 5000`) rounding up.
   - Property `checkFeePolicy guarantees F ≤ G`: for every generated policy with `checkFeePolicy(policy).ok` and every `G ∈ [minimum, MAX]`, `computeCaptureFee` does not throw `FEE_EXCEEDS_GROSS`.
-  - `checkFeePolicy` cases: `bp 5000 / fixed 30 / minimum 30 rejected` (F(30)=45 > 30), `bp 290 / fixed 30 / minimum 30 accepted`, `bp 10000 / fixed 0 / minimum 1 accepted`, `bp 10000 / fixed 1 / minimum 1000 rejected`, `minimum < fixed rejected`, `minimum 0 rejected`, `bp 10001 rejected`.
+  - `checkFeePolicy` cases: `bp 5000 / fixed 30 / minimum 30 rejected` (F(30)=45 > 30), `bp 290 / fixed 30 / minimum 31 accepted` (F(31)=31, so fee == gross at the boundary), `bp 290 / fixed 30 / minimum 30 rejected` (F(30)=31 > 30 — the case that the pre-D-07 rule wrongly accepted), `bp 10000 / fixed 0 / minimum 1 accepted`, `bp 10000 / fixed 1 / minimum 1000 rejected`, `minimum < fixed rejected`, `minimum 0 rejected`, `bp 10001 rejected`.
   - Property `FEE_EXCEEDS_GROSS thrown iff F > G` for unconstrained inputs.
   - Property `non-negative increments`: random `G ∈ [1, MAX]`, `F ∈ [0, G]`, random partition of `G` into 1–20 positive refunds, random permutation → every increment ≥ 0.
   - Property `no over-reversal at any prefix`: cumulative increments ≤ `F` and equal `target(prefix sum)`.
@@ -389,7 +389,7 @@ with checked `bigint` arithmetic, and lock it with golden vectors and properties
    ```
    serialized with `canonicalJson`, hashed as UTF-8 with SHA-256. Validation before hashing (else `INVALID_REQUEST/VALUE_MALFORMED`): `pathParams` key set equals the template's; `paymentId` passes `parseId('pay', …)`; `ifMatch` is `null` or matches `^"payment-pay_[0-7][0-9A-HJKMNP-TV-Z]{25}-v[1-9][0-9]*"$` (strong single Payment ETag; weak tags and lists rejected). Merchant, idempotency key, credentials, request/correlation IDs, and `traceparent` are not inputs (docs/05).
 
-**Golden vectors** (`request-hash.v1.json`; `P = pay_01ARZ3NDEKTSV4RRFFQ69G5FAV`; canonical JSON shown is the exact hashed UTF-8 text; SHA-256 lowercase hex computed during planning)
+**Golden vectors** (`request-hash.v1.json`; `P = pay_01ARZ3NDEKTSV4RRFFQ69G5FAV`; canonical JSON shown is the exact hashed UTF-8 text; SHA-256 lowercase hex computed during planning). The `pm_sandbox_123` value in the two `create` bodies is a synthetic byte sequence standing in for a payment-method reference: request hashing never validates the token, so these digests are unaffected by which token family the API accepts. Do not change those bodies without recomputing both digests.
 | id | Input (commandType / pathParams / body / ifMatch) | Canonical JSON | SHA-256 |
 | --- | --- | --- | --- |
 | `create` | CREATE_PAYMENT / `{}` / `{"amount":{"amountMinor":"10000","currency":"USD"},"paymentMethodRef":"pm_sandbox_123","provider":"fake-provider"}` / null | `{"apiVersion":"v1","body":{"amount":{"amountMinor":"10000","currency":"USD"},"paymentMethodRef":"pm_sandbox_123","provider":"fake-provider"},"commandType":"CREATE_PAYMENT","hashVersion":1,"ifMatch":null,"method":"POST","pathParams":{},"route":"/v1/payments"}` | `8ad048fb808f257f1a6d7e0684728cc35648d9efc251977f8a4a457127fff893` |
