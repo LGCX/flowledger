@@ -18,6 +18,7 @@
  * stack, and a hook that requires Docker would block commits whenever it is not running.
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import process from 'node:process';
 
 const BASE_BRANCHES = ['main', 'master'];
@@ -62,7 +63,42 @@ if (BASE_BRANCHES.includes(branch)) {
 
 process.stdout.write(`\n  task gate on branch "${branch}"${full ? ' (full)' : ''}\n`);
 
-// 2. Required checks.
+// 2. pnpm must be usable before anything is run through it. Without this preflight a broken
+//    Corepack shows up as a stack trace from an unrelated command and looks like a code
+//    failure; the actual remedy is an environment fix.
+const { packageManager } = JSON.parse(readFileSync('package.json', 'utf8'));
+const expectedPnpm =
+  typeof packageManager === 'string' ? packageManager.replace(/^pnpm@/, '') : undefined;
+
+const versionResult = spawnSync('pnpm', ['--version'], { encoding: 'utf8' });
+const pnpmVersion = versionResult.status === 0 ? versionResult.stdout.trim() : undefined;
+
+if (pnpmVersion === undefined) {
+  const detail = `${versionResult.stdout ?? ''}${versionResult.stderr ?? ''}`.trim();
+  const staleCorepack = detail.includes('Cannot find matching keyid');
+  fail(
+    'pnpm is not usable in this shell, so the gates cannot run.\n' +
+      (staleCorepack ? '      This is a stale Corepack signing key, not a code failure.\n' : '') +
+      '      Remedy (once, in your own terminal):\n' +
+      '        nvm install 24.22.1 && nvm use 24.22.1\n' +
+      '        corepack enable pnpm\n' +
+      '        nvm alias default 24.22.1   # so a new shell does not fall back to an older Node\n' +
+      '      Until then the gate can be bypassed with `git commit --no-verify`, but say so in the\n' +
+      '      task report rather than leaving an unverified commit.',
+  );
+}
+
+if (expectedPnpm !== undefined && pnpmVersion !== expectedPnpm) {
+  fail(
+    `pnpm ${pnpmVersion} is running but package.json pins pnpm@${expectedPnpm}.\n` +
+      '      Run the pinned version with:\n' +
+      `        corepack prepare pnpm@${expectedPnpm} --activate`,
+  );
+}
+
+process.stdout.write(`  pnpm ${pnpmVersion} ok\n`);
+
+// 3. Required checks.
 run('pnpm check', 'pnpm', ['check']);
 run('pnpm build', 'pnpm', ['build']);
 
