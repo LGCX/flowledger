@@ -15,11 +15,14 @@
     "test:contracts": "vitest run --project contracts",
     "test:integration": "vitest run --project integration",
     "test:e2e": "vitest run --project e2e",
-    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:contracts",
+    "check": "pnpm lint && pnpm contracts:check && pnpm typecheck && pnpm test:unit && pnpm test:contracts",
     "db:up": "docker compose -f infra/docker/compose.yaml up -d --wait",
-    "db:down": "docker compose -f infra/docker/compose.yaml down -v"
+    "db:down": "docker compose -f infra/docker/compose.yaml down -v",
+    "contracts:generate": "node scripts/contracts-generate.mjs",
+    "contracts:check": "node scripts/contracts-check.mjs"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
     "@eslint/js": "9.39.5",
     "@flowledger/app-api": "workspace:*",
     "@flowledger/app-cli": "workspace:*",
@@ -43,6 +46,8 @@
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "eslint": "9.39.5",
+    "json-schema-to-typescript": "16.0.0",
+    "openapi-typescript": "7.13.0",
     "pg": "8.23.1",
     "prettier": "3.9.10",
     "typescript": "5.9.3",

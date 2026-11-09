@@ -23,15 +23,18 @@ version a hard install failure rather than a warning.
 
 ## devDependencies
 
-| Package             | Pinned version | Purpose                                    |
-| ------------------- | -------------- | ------------------------------------------ |
-| `typescript`        | 5.9.3          | compiler                                   |
-| `@types/node`       | 24.19.2        | Node.js typings for the pinned Node 24     |
-| `vitest`            | 4.1.12         | test runner; `test.projects` needs >= 3.2  |
-| `eslint`            | 9.39.5         | linter (flat config)                       |
-| `@eslint/js`        | 9.39.5         | ESLint core `recommended` config           |
-| `typescript-eslint` | 8.72.1         | TypeScript parser and `recommended` config |
-| `prettier`          | 3.9.10         | formatter                                  |
+| Package                       | Pinned version | Purpose                                    |
+| ----------------------------- | -------------- | ------------------------------------------ |
+| `typescript`                  | 5.9.3          | compiler                                   |
+| `@types/node`                 | 24.19.2        | Node.js typings for the pinned Node 24     |
+| `vitest`                      | 4.1.12         | test runner; `test.projects` needs >= 3.2  |
+| `eslint`                      | 9.39.5         | linter (flat config)                       |
+| `@eslint/js`                  | 9.39.5         | ESLint core `recommended` config           |
+| `typescript-eslint`           | 8.72.1         | TypeScript parser and `recommended` config |
+| `prettier`                    | 3.9.10         | formatter                                  |
+| `openapi-typescript`          | 7.13.0         | `openapi.ts` generation (P00-T07)          |
+| `json-schema-to-typescript`   | 16.0.0         | `messages.ts` generation (P00-T07)         |
+| `@apidevtools/swagger-parser` | 13.1.0         | parses `openapi.yaml` for both generators  |
 
 `typescript`, `@types/node`, and `@eslint/js` are not on the CONVENTIONS §2 approved-dependency
 list. They are justified in the P00-T01 commit body: no approved package provides the compiler,
