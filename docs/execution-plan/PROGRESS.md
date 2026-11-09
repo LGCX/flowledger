@@ -1648,7 +1648,48 @@ Next task: P02-T07.
 4. The `ROUTE_DISABLED` branch was unreachable through the default path (a disabled default is simply
    not selectable), which is exactly why the break did not bite until an explicit-code case existed.
 
-**Next task:** `P02-T07`.
+## P02-T07 — Migration 0230: fee policies and the merchant fixture
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T08.
+
+```text
+TASK P02-T07 — NEEDS-REVIEW
+Acceptance criteria:
+  - (290,30,30) rejected by fee_policies_fee_within_minimum -> met
+  - minimum below the fixed component, minimum 0 rejected -> met (23514, see deviation 1)
+  - minimum 50 accepted; boundary minimum 31 accepted with fee == gross -> met, fee asserted to be 31
+  - only superseded_at may change, once; at most one current policy -> met
+  - createTestMerchant twice yields disjoint ids and both commit -> met
+Tests added: test/integration/db/fee-policies.test.ts (27), packages/testkit/src/fixtures/merchant.ts
+  break-and-restore (each observed failing, then restored):
+    fee_within_minimum relaxed to true        -> 2 cases fail
+    one_current index dropped                 -> coverage + 2nd-current cases fail
+    immutability guard dropped                -> the pricing-column case fails
+    monotonic trigger dropped                 -> 2 cases fail
+    minimum_capture relaxed to >= 1 (handoff) -> DID NOT FAIL, and cannot (see below)
+    baseline after restore                    -> 27 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. The handoff item "relaxing fee_policies_minimum_capture to >= 1 makes the boundary test fail" is
+     not satisfiable: the constraint is redundant by construction. If fee_at(minimum) <= minimum and
+     the fee includes the fixed component, then minimum >= fixed — so any row passing
+     fee_policies_fee_within_minimum also passes fee_policies_minimum_capture. Verified by applying
+     the relaxation: every test still passed, and the below-fixed case is rejected by
+     fee_policies_fee_within_minimum. The check is kept as a readable statement of intent and as a
+     guard should the fee formula stop including the fixed amount; the test states this rather than
+     asserting a distinction that does not exist. This supersedes the earlier note that called it
+     "redundant but harmless" — it is redundant, provably, and now recorded as such.
+  2. Version reuse is refused by the monotonic trigger (INVALID_TRANSITION) before the unique keys are
+     consulted, so the duplicate-version case asserts the trigger rather than a constraint name. The
+     unique keys remain as a second line of defence and are covered by assertConstraintCoverage.
+  3. Two fixed-amount bound cases assert SQLSTATE 23514 only: an over-large fixed amount cannot satisfy
+     fee_within_minimum at any permitted minimum, so that check fires first. The plan anticipates this.
+Contract/plan issues found: item 1 above — a handoff checklist item that cannot be satisfied because
+the constraint it targets is subsumed.
+Next task: P02-T08.
+```
+
+**Next task:** `P02-T08`.
 
 
 
