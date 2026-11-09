@@ -1245,7 +1245,41 @@ Next task: P01-T11.
 seed/path/counterexample and discards `details.errorInstance`, so a property failure prints no cause.
 Finding defects 1–3 above required temporarily patching the reporter.
 
-**Next task:** `P01-T11`.
+## P01-T11 — Provider result, error, and evidence types
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T12.
+
+```text
+TASK P01-T11 — NEEDS-REVIEW
+Acceptance criteria:
+  - @ts-expect-error type tests for each impossible construction, with `pnpm typecheck` passing -> met, 7 cases
+  - each runtime constructor rule has a negative test -> met (32 tests)
+  - unions equal the schema enums -> array lengths/order asserted here; full parity at P01-GATE
+Tests added: packages/domain/src/provider.test.ts (32)
+  break-and-restore (each observed failing, then restored):
+    noEffectProof removed from the FAILED variant (handoff) -> typecheck exit 2, TS2578 twice
+    AUTHORIZE stops requiring providerAuthorizationId           -> 1 test fails
+    evidence accepts an event id from any source               -> 1 test fails
+    retry deadline bound removed                               -> 1 test fails
+    baseline after restore -> typecheck 0, 32 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text: none.
+Contract/plan issues found: none.
+Next task: P01-T12.
+```
+
+**A method error worth recording.** The first handoff break "passed" because I typechecked
+`packages/domain/tsconfig.json`, which excludes tests. `pnpm typecheck` (`tsc -b`, the real gate) failed
+exactly as the checklist predicted. Running the narrower command would have produced a false
+"break did not bite" conclusion.
+
+That real run then exposed a second, genuine defect: six lines of my own type tests did not compile.
+`@ts-expect-error` on the line before a multi-line object literal does not cover errors attributed to
+individual property lines, so three of the seven "impossible" constructions were actually failing to
+compile for the *wrong* reason or not being suppressed at all. Directives now sit on the offending
+property line, and `noEffectProof`-style missing-property cases stay on the declaration line.
+
+**Next task:** `P01-T12`.
 
 
 

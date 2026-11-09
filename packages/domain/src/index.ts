@@ -9,3 +9,4 @@ export * from './posting-hash.js';
 export * from './payment.js';
 export * from './commands.js';
 export * from './transitions.js';
+export * from './provider.js';
