@@ -1089,7 +1089,44 @@ Contract/plan issues found: the ordering example above is not constructible unde
 Next task: P01-T07.
 ```
 
-**Next task:** `P01-T07`.
+## P01-T07 — Payment model, invariant checker, summary status
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T08.
+
+```text
+TASK P01-T07 — NEEDS-REVIEW
+Acceptance criteria:
+  - each invariant has a minimal violating fixture -> met, 18 cases; implied ids listed explicitly
+  - each of the 11 summary rules has a fixture proving precedence -> met, 13 cases (rules 8 and 10
+    each have two)
+  - SummaryStatus union equals the openapi enum -> deferred to P01-GATE as specified
+Tests added: packages/domain/src/payment.test.ts (47)
+  break-and-restore (each observed failing, then restored):
+    reservation/count equivalence removed  -> 2 fail
+    reservation-sum check removed          -> 2 fail
+    voided allowance check removed         -> 2 fail
+    summary rule 2 removed                 -> the OUTCOME_UNKNOWN precedence case fails
+    summary rule 5 removed                 -> the PARTIALLY_REFUNDED precedence case fails
+    captured-iff-one-success removed       -> 2 fail
+    baseline after restore                 -> 47 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `INVARIANT_IDS` is exported as a runtime array (the task shows only the type), so tests can
+     assert every id has a fixture.
+  2. The checker reports `VOIDED_LE_AUTHORIZED_MINUS_CAPTURED` alongside `CAPTURED_LE_AUTHORIZED`
+     when `captured > authorized`: the allowance `authorized - captured` is then negative, so even
+     `voided = 0` exceeds it. The contract states the rule literally and the extra id is genuinely
+     true, so it is reported rather than clamped to zero.
+Contract/plan issues found: none.
+Next task: P01-T08.
+```
+
+**Note:** this file uses `number` for `version` and `unresolvedRefundCount` and `MinorUnits` for every
+amount, which is why the money lint rule is scoped to `money.ts`/`fees.ts` rather than all of `src/`.
+The scoping question raised at P01-T01 is therefore resolved by evidence: `payment.ts` would fail a
+blanket rule while being correct.
+
+**Next task:** `P01-T08`.
 
 
 

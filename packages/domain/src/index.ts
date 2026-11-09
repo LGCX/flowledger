@@ -6,3 +6,4 @@ export * from './fees.js';
 export * from './canonical-json.js';
 export * from './request-hash.js';
 export * from './posting-hash.js';
+export * from './payment.js';
