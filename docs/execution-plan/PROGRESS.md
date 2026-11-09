@@ -306,4 +306,39 @@ this task's Files list.
 Next task: P00-T05 (dependencies satisfied: yes — P00-T01).
 ```
 
-**Next task:** `P00-T05`, after owner approval.
+## Infrastructure — workspace specifier resolution
+
+**Status:** `DONE` — `cb8fdf4`, merged into `main`.
+
+Bridged the gap that P00-T04 had to work around and that P00-T05 would have hit again.
+Root cause was two independent failures:
+
+1. The root manifest linked only the nine apps, so `@flowledger/<package>` was absent
+   from `node_modules`. All eight packages are now root `workspace:*` devDependencies.
+2. Vitest externalises `node_modules`, so a bare specifier resolved through Node to the
+   package's `default` condition — the unbuilt `dist/index.js`. `server.deps.inline`
+   for `@flowledger/` is now part of `shared`, which all five projects spread. A
+   root-level `test.server` setting does not reach the named projects; that was tried
+   first and had no effect.
+
+`test/contract/app-startup.test.ts` now imports `@flowledger/app-<app>/main`, as
+P00-T04 specified, so that task's deviation 1 is retired.
+
+Verified: `@flowledger/config` and `@flowledger/app-api/main` resolve; `pnpm check` 0,
+`pnpm build` 0, `pnpm test:integration` 0, `pnpm test:e2e` 0; clean clone install 0,
+check 0, build 0.
+
+### Toolchain (resolved, no longer a caveat)
+
+Node 24.22.1 is now installed under `~/.nvm` by the owner, so the earlier
+`/tmp/fl-node24` extract was deleted and nothing depends on it. Gates run as
+`PATH="$HOME/.nvm/versions/node/v24.22.1/bin:$PATH"` with
+`COREPACK_HOME=/tmp/fl-corepack`.
+
+One caveat remains until the owner runs `nvm use 24.22.1 && corepack enable pnpm` in
+their own terminal: Node 24 ships no `pnpm` shim, so `pnpm` still resolves to the
+`v23.1.0` shim (it works — Corepack reads the `packageManager` pin and runs 10.34.9),
+and the Corepack cache lives in `/tmp`, so pnpm re-downloads after a reboot.
+
+**Next task:** `P00-T05`.
+
