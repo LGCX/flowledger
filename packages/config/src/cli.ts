@@ -15,6 +15,10 @@ export interface CliConfig {
   readonly ledgerEnvironment: 'LOCAL' | 'SANDBOX';
   readonly localRolePassword: string | null;
   readonly databasePoolMax: number;
+  /** Required by `seed` and `credentials issue`; absent elsewhere. Parsed by the command. */
+  readonly apiCredentialPeppers: string | null;
+  /** Required by `credentials`; must connect as `fl_operator_command`. */
+  readonly operatorDatabaseUrl: string | null;
 }
 
 export class CliConfigError extends Error {
@@ -58,6 +62,19 @@ function readInteger(
   return parsed;
 }
 
+/** Validates a database URL without ever echoing it: these strings contain passwords. */
+function assertPostgresUrl(variable: string, value: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new CliConfigError(variable, 'must be a valid postgres URL');
+  }
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    throw new CliConfigError(variable, 'must be a postgres URL');
+  }
+}
+
 export function loadCliConfig(env: NodeJS.ProcessEnv): Readonly<CliConfig> {
   const migrationDatabaseUrl = requireValue(env, 'MIGRATION_DATABASE_URL');
 
@@ -78,6 +95,9 @@ export function loadCliConfig(env: NodeJS.ProcessEnv): Readonly<CliConfig> {
   }
 
   const localRolePassword = optionalValue(env, 'FLOWLEDGER_LOCAL_ROLE_PASSWORD');
+  const apiCredentialPeppers = optionalValue(env, 'API_CREDENTIAL_PEPPERS');
+  const operatorDatabaseUrl = optionalValue(env, 'OPERATOR_DATABASE_URL');
+  if (operatorDatabaseUrl !== null) assertPostgresUrl('OPERATOR_DATABASE_URL', operatorDatabaseUrl);
   if (localRolePassword !== null && env.NODE_ENV === 'production') {
     throw new CliConfigError(
       'FLOWLEDGER_LOCAL_ROLE_PASSWORD',
@@ -92,5 +112,7 @@ export function loadCliConfig(env: NodeJS.ProcessEnv): Readonly<CliConfig> {
     ledgerEnvironment: environment,
     localRolePassword,
     databasePoolMax: readInteger(env, 'DATABASE_POOL_MAX', 4, 1, 100),
+    apiCredentialPeppers,
+    operatorDatabaseUrl,
   });
 }

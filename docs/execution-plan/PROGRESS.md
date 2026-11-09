@@ -1987,7 +1987,44 @@ Worth recording: the explicit-predicate break *does* bite, because the repositor
 owner connection that bypasses RLS. That is the point of having both guarantees — it proves the
 predicate is load-bearing rather than decorative behind a policy that already filters.
 
-**Next task:** `P02-T15`.
+## P02-T15 — Dev seed and credential issue/revoke commands
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to `P02-T16`.
+
+```text
+TASK P02-T15 — NEEDS-REVIEW
+Acceptance criteria:
+  - seed creates exactly 2 merchants, 4 provider accounts, 4 account versions, 4 provider credentials,
+    4 routes (2 default), 2 fee policies, 2 webhook endpoints, 2 secret versions, 4 endpoint-account
+    rows and 3 API credentials -> met (asserted by count, not by exit code)
+  - every printed credential verifies against its stored digest and is found by lookupCredential -> met
+    for all three (prefix resolves; a credential built from a different secret does not verify)
+  - providers.select_route(A, 'SIMULATOR', NULL) returns pacc_...FAKEA version 1 -> met, for A and B
+  - second run is a no-op; production refusal works -> met (counts unchanged; exit 1 and nothing created)
+  - credentials revoke makes lookupCredential return null for that prefix -> met (revoke then a second
+    revoke exits 1 with "not found or already revoked")
+Tests added: test/integration/cli/seed.test.ts (8)
+  break-and-restore: not applicable in the usual sense — this task adds commands rather than guards, so
+  the equivalent proof is the negative cases above (production refusal, wrong scope, wrong operator
+  role, second revoke) plus the counts, each of which fails if the behaviour is removed.
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 387, e2e 0
+Deviations from the task text:
+  1. `apps/cli/src/main.test.ts` asserted `seed` returns 2 ("not implemented until P02"). That stub
+     behaviour is what this task replaces, so the test now asserts the real contract: without
+     `--profile dev` the command refuses with exit 1.
+  2. `API_CREDENTIAL_PEPPERS` uses `<integer>:<base64url>` — `parsePeppers` rejects a `v1:` prefix and
+     rejects padded base64url. Both were found by running the command.
+Contract/plan issues found: none.
+Next task: P02-T16.
+```
+
+Notes worth keeping: the seed's fixed IDs and the `unreliable-provider` code are the **[ASSUMPTION]** items
+R12 already recorded. `parsePeppers` requires an unpadded base64url pepper of at least 32 bytes and a bare
+integer version, and `providers.select_route` is not executable by the migration owner — the route
+assertion runs as `payments_function_owner`, which is a useful reminder that function owners are not
+interchangeable.
+
+**Next task:** `P02-T16`.
 
 
 

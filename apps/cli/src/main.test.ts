@@ -54,10 +54,11 @@ describe('runCli', () => {
     expect(test.out.join('\n')).not.toContain('not implemented');
   });
 
-  it('seed returns 2 and names P02', async () => {
+  it('seed requires an explicit dev profile', async () => {
+    // Implemented by P02-T15: without `--profile dev` the command refuses rather than guessing.
     const test = capture();
-    expect(await runCli(['seed'], test.io)).toBe(2);
-    expect(test.err).toEqual(['flowledger seed: not implemented until P02']);
+    expect(await runCli(['seed'], test.io)).toBe(1);
+    expect(test.out).toContain('seed: only --profile dev is supported');
   });
 
   it('verify returns 2 and names P03', async () => {

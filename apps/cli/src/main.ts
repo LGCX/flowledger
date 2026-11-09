@@ -6,7 +6,9 @@
  * favour the standard library over a dependency.
  */
 
+import { credentialsCommand } from './commands/credentials.js';
 import { migrateCommand } from './commands/migrate.js';
+import { seedCommand } from './commands/seed.js';
 
 export interface CliIo {
   out(line: string): void;
@@ -19,6 +21,7 @@ const USAGE: readonly string[] = [
   'commands:',
   '  migrate   apply pending database migrations',
   '  seed      load seed data for the given profile',
+  '  credentials  issue or revoke a merchant API credential',
   '  verify    run the ledger invariant checker',
 ];
 
@@ -38,9 +41,12 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
   switch (command) {
     case 'migrate':
       return migrateCommand(argv.slice(1), process.env, io.out);
-    case 'seed':
-      io.err('flowledger seed: not implemented until P02');
-      return NOT_IMPLEMENTED;
+    case 'seed': {
+      const result = await seedCommand(argv.slice(1), process.env, io.out);
+      return result.exitCode;
+    }
+    case 'credentials':
+      return credentialsCommand(argv.slice(1), process.env, io.out);
     case 'verify':
       io.err('flowledger verify: not implemented until P03');
       return NOT_IMPLEMENTED;
