@@ -47,6 +47,15 @@ fc.configureGlobal({
       // thrown error below still carries the seed and the counterexample.
     }
 
-    throw new Error(fc.defaultReportMessage(details));
+    // `defaultReportMessage` carries the seed, path, and counterexample but not the failure itself,
+    // which left every property failure printing a location with no cause.
+    const cause = (details as unknown as { errorInstance?: unknown }).errorInstance;
+    const causeMessage =
+      cause instanceof Error ? cause.message : cause === undefined ? '' : String(cause);
+    throw new Error(
+      causeMessage === ''
+        ? fc.defaultReportMessage(details)
+        : `${fc.defaultReportMessage(details)}\n\nCause: ${causeMessage}`,
+    );
   },
 });
