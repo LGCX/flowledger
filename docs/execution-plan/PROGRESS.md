@@ -554,7 +554,52 @@ Next task: P00-T10.
 2. The `truncated` field in the docs/05 timeline example (Step 1, R-02) is now load-bearing:
    removing it fails `PaymentTimeline`. That was a live contract defect, not a style nit.
 
-**Next task:** `P00-T10`.
+## P00-T10 — Positive and negative message fixtures
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P00-T11.
+
+```text
+TASK P00-T10 — NEEDS-REVIEW
+Commit: 473b9c4 on task/p00-t10-message-fixtures
+Acceptance criteria:
+  - all ten README item-6 defect classes present -> met (12 named cases, asserted by name)
+  - each negative checks the failing keyword, not just ok=false -> met
+  - every registered type has >= 1 positive and >= 5 negatives -> met (26 types, 7 universal
+    negatives each, 25 cases total spanning 300 type-case pairs)
+Tests added: message-fixtures.test.ts (338 incl. 300 negative case-pairs),
+             merchant-webhook-payload.test.ts (20)
+  break-and-restore (each observed failing, then restored):
+    negative case expects the wrong keyword   -> 16 fail (ok-only would have passed)
+    positive fixture given a zero amount      -> 2 fail
+    a fixture removed                         -> 10 fail
+    payment.created.v1 added to the allowlist -> 2 fail
+    provider ID added to the public payload   -> all positive payload cases fail
+    baseline after restore                    -> 338 + 20 passing
+Commands: pnpm check 0 | integration 0 | e2e 0 | build 0
+          contract lane: 11 files, 480 tests
+          clean clone: install 0, check 0, build 0
+Deviations from the task text:
+  1. `terminal()` takes `outcome` explicitly. The first version derived it from
+     `resultCode`, which labelled all four FAILED fixtures REJECTED; the positives caught it.
+  2. `payment.capture.succeeded.v1` carries `providerOperationId: 'provider_capture_123'`
+     from the docs/04 example rather than the generic `provider_operation_123` the other
+     terminal fixtures use, because the task requires that fixture to be the example exactly.
+  3. `merchant-webhook-payload.test.ts` adds a 10th assertion refusing `redactedEvidenceRef`
+     in the public projection, alongside the required provider-identifier case.
+Contract/plan issues found: none.
+Next task: P00-T11.
+```
+
+**Notes worth keeping:**
+1. `merchant.webhook.deliver.v1` must order on `whe_`, not `whd_`: the envelope makes
+   `orderingKey` mandatory, the command schema pins it to an endpoint ID, and
+   `schemas/README.md` requires `orderingKey === data.endpointId`. Ordering on the delivery
+   would silently break per-endpoint ordering.
+2. Fixtures satisfy P00-T11's correlational rules as well as the schemas, so "valid" here
+   means valid for the whole pipeline, not just Ajv.
+
+**Next task:** `P00-T11`.
+
 
 
 
