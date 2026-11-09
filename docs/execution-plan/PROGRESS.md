@@ -2026,10 +2026,29 @@ interchangeable.
 
 **Next task:** `P02-T16`.
 
+## P02-GATE — Persistence-ready verification
 
+**Status:** `NEEDS-REVIEW` — every M2 test criterion verified; the Docker Compose walkthrough is an open
+item recorded in `docs/evidence/P02.md`.
 
-
-
-
-
-
+```text
+TASK P02-GATE — NEEDS-REVIEW
+Acceptance criteria:
+  - all ten docs/10 M2 criteria map to passing tests in docs/evidence/P02.md -> met
+  - test/fixtures/db/P02.sql restores and migrates forward with zero errors -> met
+    (migrate() applies 0 files; aggregate rules hold with SET CONSTRAINTS ALL IMMEDIATE; every outbox
+     row still carries its hot envelope)
+  - the composition test proves claim + payment + outbox commit or roll back together -> met
+    (4/4 in p02-acceptance.test.ts, including a failure injected after all three writes leaving 0/0/0)
+  - no feature code changed -> met (testkit fixtures, tests, a generator script and evidence only)
+Tests added: test/integration/db/migrate-forward.test.ts (3),
+  test/integration/db/p02-acceptance.test.ts (4); fixtures populate-p02.ts, p02-fixture.ts,
+  test/fixtures/db/generate-p02.mjs, test/fixtures/db/P02.sql (156 KB, 19 tables)
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 391, e2e 0
+Open item: the Compose walkthrough. `pnpm db:up` is healthy, but `migrate --bootstrap` → `migrate` →
+`seed --profile dev` fails with `relation "identity.merchants" does not exist`; `migrate` exits 0 without
+the schema reaching that database. Also `db:migrate`/`db:seed` scripts do not exist in package.json. Not
+fixed here: P02-GATE may not modify apps/** or packages/database/**, and a fix is a feature change.
+Follow-up: resolve the Compose wiring and add the two scripts.
+Next task: P03-T01 (Ledger core, M3).
+```
