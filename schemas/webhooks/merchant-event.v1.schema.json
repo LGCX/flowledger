@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/webhooks/merchant-event.v1.schema.json",
+  "title": "FlowLedger merchant webhook event v1",
+  "type": "object",
+  "required": ["id", "type", "schemaVersion", "createdAt", "merchantId", "data"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable originating domain-event UUID; not the HTTP delivery ID."
+    },
+    "type": {
+      "description": "Public allowlist. payment.created.v1 is deliberately absent: the merchant issued that command synchronously and already holds the committed representation, so a notification for it is noise every integration would filter.",
+      "enum": [
+        "payment.authorization.succeeded.v1",
+        "payment.authorization.rejected.v1",
+        "payment.authorization.expired.v1",
+        "payment.capture.succeeded.v1",
+        "payment.capture.rejected.v1",
+        "payment.authorization.cancellation.succeeded.v1",
+        "payment.authorization.cancellation.rejected.v1",
+        "payment.refund.succeeded.v1",
+        "payment.refund.rejected.v1"
+      ]
+    },
+    "schemaVersion": { "const": 1 },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+    },
+    "merchantId": {
+      "$ref": "../common/entity-ids.v1.schema.json#/$defs/merchantId"
+    },
+    "data": { "$ref": "#/$defs/data" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.succeeded.v1",
+              "payment.authorization.rejected.v1",
+              "payment.authorization.expired.v1"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "operationType": { "const": "AUTHORIZE" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": ["payment.capture.succeeded.v1", "payment.capture.rejected.v1"]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "operationType": { "const": "CAPTURE" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.cancellation.succeeded.v1",
+              "payment.authorization.cancellation.rejected.v1"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "operationType": { "const": "CANCEL" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": ["payment.refund.succeeded.v1", "payment.refund.rejected.v1"]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "operationType": { "const": "REFUND" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.succeeded.v1",
+              "payment.capture.succeeded.v1",
+              "payment.authorization.cancellation.succeeded.v1",
+              "payment.refund.succeeded.v1"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "outcome": { "const": "SUCCEEDED" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.rejected.v1",
+              "payment.capture.rejected.v1",
+              "payment.authorization.cancellation.rejected.v1",
+              "payment.refund.rejected.v1"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "outcome": { "const": "REJECTED" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "payment.authorization.expired.v1" } },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": { "properties": { "outcome": { "const": "EXPIRED" } } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "paymentId",
+        "paymentVersion",
+        "operationId",
+        "operationType",
+        "outcome",
+        "amount",
+        "totals",
+        "summaryStatus"
+      ],
+      "properties": {
+        "paymentId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId"
+        },
+        "paymentVersion": { "type": "integer", "minimum": 1 },
+        "operationId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId"
+        },
+        "operationType": {
+          "enum": ["AUTHORIZE", "CAPTURE", "CANCEL", "REFUND"]
+        },
+        "outcome": {
+          "enum": ["SUCCEEDED", "REJECTED", "EXPIRED"]
+        },
+        "amount": { "$ref": "../common/positive-money.v1.schema.json" },
+        "totals": {
+          "$ref": "../common/payment-totals.v1.schema.json"
+        },
+        "summaryStatus": {
+          "enum": [
+            "REQUIRES_REVIEW",
+            "OUTCOME_UNKNOWN",
+            "PROCESSING",
+            "REFUNDED",
+            "PARTIALLY_REFUNDED",
+            "CAPTURED",
+            "PARTIALLY_CAPTURED",
+            "CANCELED",
+            "EXPIRED",
+            "AUTHORIZED",
+            "AUTHORIZATION_FAILED",
+            "REQUIRES_AUTHORIZATION"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

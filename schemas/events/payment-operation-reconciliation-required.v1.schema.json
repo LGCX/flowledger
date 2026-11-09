@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/payment-operation-reconciliation-required.v1.schema.json",
+  "title": "Payment operation reconciliation required event v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "payment.operation.reconciliation.required.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "payment" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "paymentId",
+        "operationType",
+        "provider",
+        "providerAccountId",
+        "providerAttemptId",
+        "providerIdempotencyKey",
+        "redactedEvidenceRef",
+        "reason",
+        "unknownSince",
+        "nextAttemptAt"
+      ],
+      "properties": {
+        "operationId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId" },
+        "paymentId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "operationType": { "enum": ["AUTHORIZE", "CAPTURE", "CANCEL", "REFUND"] },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "providerAccountId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAccountId" },
+        "providerAttemptId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAttemptId" },
+        "providerIdempotencyKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "redactedEvidenceRef": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "reason": {
+          "enum": [
+            "TIMEOUT_AFTER_SEND",
+            "CONNECTION_LOST_AFTER_SEND",
+            "PROVIDER_5XX_AMBIGUOUS",
+            "SDK_EXCEPTION_AFTER_SEND",
+            "MALFORMED_PROVIDER_RESPONSE",
+            "MISSING_PROVIDER_CORRELATION",
+            "WORKER_CRASH_AFTER_SEND",
+            "STALE_PROCESSING",
+            "ADAPTER_DEFECT"
+          ]
+        },
+        "unknownSince": { "type": "string", "format": "date-time" },
+        "nextAttemptAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

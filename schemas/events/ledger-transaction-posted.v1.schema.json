@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/ledger-transaction-posted.v1.schema.json",
+  "title": "Ledger transaction posted event v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "ledger.transaction.posted.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "ledger_transaction" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId" },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data": {
+            "required": ["operationType"],
+            "properties": {
+              "operationType": { "enum": ["CAPTURE", "REFUND"] }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": ["paymentId", "paymentOperationId"],
+            "properties": {
+              "paymentId": {
+                "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId"
+              },
+              "paymentOperationId": {
+                "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId"
+              },
+              "settlementBatchId": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data": {
+            "required": ["operationType"],
+            "properties": {
+              "operationType": { "const": "SETTLEMENT" }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": ["settlementBatchId"],
+            "properties": {
+              "paymentId": { "type": "null" },
+              "paymentOperationId": { "type": "null" },
+              "settlementBatchId": {
+                "$ref": "../common/entity-ids.v1.schema.json#/$defs/settlementBatchId"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "ledgerTransactionId",
+        "postingKey",
+        "operationType",
+        "currency",
+        "entryCount",
+        "totalDebitsMinor",
+        "totalCreditsMinor",
+        "recordedAt"
+      ],
+      "properties": {
+        "ledgerTransactionId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId" },
+        "paymentId": {
+          "oneOf": [
+            { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+            { "type": "null" }
+          ]
+        },
+        "paymentOperationId": {
+          "oneOf": [
+            { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId" },
+            { "type": "null" }
+          ]
+        },
+        "postingKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "operationType": { "enum": ["CAPTURE", "REFUND", "SETTLEMENT", "REVERSAL", "ADJUSTMENT"] },
+        "settlementBatchId": {
+          "oneOf": [
+            { "$ref": "../common/entity-ids.v1.schema.json#/$defs/settlementBatchId" },
+            { "type": "null" }
+          ]
+        },
+        "currency": { "const": "USD" },
+        "entryCount": { "type": "integer", "minimum": 2 },
+        "totalDebitsMinor": { "type": "string", "pattern": "^([1-9][0-9]{0,11}|1000000000000)$" },
+        "totalCreditsMinor": { "type": "string", "pattern": "^([1-9][0-9]{0,11}|1000000000000)$" },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

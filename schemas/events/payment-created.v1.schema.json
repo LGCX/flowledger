@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/payment-created.v1.schema.json",
+  "title": "Payment created event v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "payment.created.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "payment" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "aggregateVersion": { "const": 1 },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "paymentId",
+        "requestedAmount",
+        "provider",
+        "providerAccountId",
+        "feePolicyVersion"
+      ],
+      "properties": {
+        "paymentId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "requestedAmount": { "$ref": "../common/positive-money.v1.schema.json" },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "providerAccountId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAccountId" },
+        "feePolicyVersion": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

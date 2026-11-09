@@ -1,0 +1,1529 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: FlowLedger Merchant API
+  version: 1.0.0-draft
+  description: >-
+    Merchant-facing API for durable payment command acceptance and payment or
+    operation retrieval. Provider-backed POST requests return after PostgreSQL
+    commit and never wait for an external provider result.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: Payments
+  - name: Operations
+  - name: Provider webhooks
+security:
+  - bearerAuth: []
+
+paths:
+  /v1/payments:
+    post:
+      tags: [Payments]
+      operationId: createPayment
+      x-required-scopes: ['payments:write']
+      summary: Create a payment
+      description: >-
+        Atomically creates a payment, its replayable idempotency result, and a
+        payment.created.v1 outbox event. No provider request is made.
+      x-flowledger-command-type: CREATE_PAYMENT
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/PaymentCreated'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '409':
+          $ref: '#/components/responses/Problem409Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+    get:
+      tags: [Payments]
+      operationId: listPayments
+      x-required-scopes: ['payments:read']
+      summary: List payments
+      description: >-
+        Returns a merchant-scoped, newest-first snapshot traversal using an
+        opaque cursor. Numeric offsets are not supported.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/PaymentsPage'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      operationId: getPayment
+      x-required-scopes: ['payments:read']
+      summary: Retrieve a payment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/PaymentFound'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/authorizations:
+    post:
+      tags: [Operations]
+      operationId: authorizePayment
+      x-required-scopes: ['payments:write']
+      summary: Authorize a payment
+      description: >-
+        Durably accepts an authorization for the payment's immutable requested
+        amount. A successful HTTP response does not mean provider authorization
+        succeeded.
+      x-flowledger-command-type: AUTHORIZE
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '409':
+          $ref: '#/components/responses/Problem409Response'
+        '412':
+          $ref: '#/components/responses/Problem412Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/captures:
+    post:
+      tags: [Operations]
+      operationId: capturePayment
+      x-required-scopes: ['payments:write']
+      summary: Capture a payment
+      description: >-
+        Durably accepts one full or partial capture. Command acceptance
+        snapshots the fee policy and exact fee amount. One successful capture
+        exhausts the MVP capture capability. The amount must be at least the
+        bound fee policy's minimum capture amount.
+      x-flowledger-command-type: CAPTURE
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmountCommandRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '409':
+          $ref: '#/components/responses/Problem409Response'
+        '412':
+          $ref: '#/components/responses/Problem412Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '422':
+          $ref: '#/components/responses/Problem422Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/cancellations:
+    post:
+      tags: [Operations]
+      operationId: cancelPaymentAuthorization
+      x-required-scopes: ['payments:write']
+      summary: Cancel a payment authorization
+      description: >-
+        Durably accepts release of the full remaining authorization. Partial
+        cancellation is not supported.
+      x-flowledger-command-type: CANCEL
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '409':
+          $ref: '#/components/responses/Problem409Response'
+        '412':
+          $ref: '#/components/responses/Problem412Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/refunds:
+    post:
+      tags: [Operations]
+      operationId: refundPayment
+      x-required-scopes: ['payments:write']
+      summary: Refund a payment
+      description: >-
+        Durably accepts one refund. The refundable limit is evaluated while the
+        payment aggregate is locked. Only one unresolved operation is permitted.
+      x-flowledger-command-type: REFUND
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmountCommandRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '409':
+          $ref: '#/components/responses/Problem409Response'
+        '412':
+          $ref: '#/components/responses/Problem412Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/operations:
+    get:
+      tags: [Operations]
+      operationId: listPaymentOperations
+      x-required-scopes: ['payments:read']
+      summary: List operations for one payment
+      description: >-
+        Verifies payment ownership before returning a page. A foreign or absent
+        payment is 404 rather than an empty collection.
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/OperationsPage'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/payments/{paymentId}/timeline:
+    get:
+      tags: [Payments]
+      operationId: getPaymentTimeline
+      x-required-scopes: ['payments:read']
+      summary: Retrieve the ordered history of one payment
+      description: >-
+        One read-only explanation of everything that happened to a payment:
+        operations, provider attempts, normalized evidence, journal postings,
+        settlement, and merchant webhook deliveries. Entries are ordered by
+        database-recorded time, never by provider-supplied timestamps. The
+        response is bounded and reports truncation rather than paginating,
+        because a payment with more history than the bound is an operator
+        investigation. No ETag is returned, because the response aggregates
+        several resources with independent versions.
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/PaymentTimelineFound'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/operations/{operationId}:
+    get:
+      tags: [Operations]
+      operationId: getOperation
+      x-required-scopes: ['payments:read']
+      summary: Retrieve a payment operation
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/OperationFound'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/MerchantProblem401Response'
+        '403':
+          $ref: '#/components/responses/Problem403Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+  /v1/provider-webhooks/{provider}/{endpointKey}:
+    post:
+      tags: [Provider webhooks]
+      operationId: ingestProviderWebhook
+      summary: Durably ingest provider evidence
+      description: >-
+        Separate provider-authenticated ingress. Merchant bearer authentication,
+        Idempotency-Key, If-Match, and caller-selected tenant identity are not
+        accepted. The implementation verifies provider-specific signature and
+        timestamp headers against the exact raw bytes before parsing. A valid
+        new or duplicate notification returns 202 only after durable receipt.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Provider'
+        - $ref: '#/components/parameters/ProviderEndpointKey'
+      requestBody:
+        required: true
+        description: >-
+          Provider-specific JSON bounded to 64 KiB. The selected provider
+          adapter supplies the concrete schema and signature headers.
+        content:
+          application/json:
+            schema: {}
+      responses:
+        '202':
+          $ref: '#/components/responses/ProviderWebhookAccepted'
+        '400':
+          $ref: '#/components/responses/Problem400Response'
+        '401':
+          $ref: '#/components/responses/ProviderWebhookProblem401Response'
+        '404':
+          $ref: '#/components/responses/Problem404Response'
+        '413':
+          $ref: '#/components/responses/Problem413Response'
+        '415':
+          $ref: '#/components/responses/Problem415Response'
+        '429':
+          $ref: '#/components/responses/Problem429Response'
+        '500':
+          $ref: '#/components/responses/Problem500Response'
+        '503':
+          $ref: '#/components/responses/Problem503Response'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Credential resolving to exactly one merchant principal and explicit
+        payments:read or payments:write scopes.
+
+  parameters:
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      description: Opaque Payment ID.
+      schema:
+        $ref: '#/components/schemas/PaymentId'
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      description: Opaque PaymentOperation ID.
+      schema:
+        $ref: '#/components/schemas/OperationId'
+    Provider:
+      name: provider
+      in: path
+      required: true
+      description: Configured sandbox-provider adapter name.
+      schema:
+        $ref: '#/components/schemas/ProviderName'
+    ProviderEndpointKey:
+      name: endpointKey
+      in: path
+      required: true
+      description: >-
+        Random opaque 26-character upper-case Crockford Base32 routing locator
+        used to select one webhook signature configuration. It contains no
+        merchant or provider-account identity and is not authentication.
+      schema:
+        type: string
+        pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        Opaque, case-sensitive key scoped by authenticated merchant and command
+        type. Required on every merchant POST. A key is never reusable in that
+        scope.
+      schema:
+        $ref: '#/components/schemas/IdempotencyKey'
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: >-
+        Optional workflow correlation ID. Excluded from the idempotency hash.
+        Exact replays return the correlation ID stored by the original command.
+      schema:
+        $ref: '#/components/schemas/CorrelationId'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: >-
+        Optional strong Payment ETag. It participates in the idempotency hash.
+        Exact replay is resolved before current-version comparison.
+      schema:
+        $ref: '#/components/schemas/PaymentETag'
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: Strong ETag returned by the relevant GET endpoint.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of resources to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: >-
+        Opaque, integrity-protected, merchant- and query-bound cursor. Cursors
+        expire after 24 hours.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 4096
+
+  headers:
+    RequestId:
+      description: Unique identifier for this HTTP attempt.
+      required: true
+      schema:
+        $ref: '#/components/schemas/RequestId'
+    CorrelationId:
+      description: Workflow correlation identifier.
+      required: true
+      schema:
+        $ref: '#/components/schemas/CorrelationId'
+    PaymentETag:
+      description: Strong ETag derived from Payment ID and aggregate version.
+      required: true
+      schema:
+        $ref: '#/components/schemas/PaymentETag'
+    OperationETag:
+      description: Strong ETag derived from operation ID and operation version.
+      required: true
+      schema:
+        $ref: '#/components/schemas/OperationETag'
+    ResourceETag:
+      description: Current strong ETag for the requested resource.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    PaymentLocation:
+      description: Canonical Payment resource path.
+      required: true
+      schema:
+        type: string
+        pattern: '^/v1/payments/pay_[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+    OperationLocation:
+      description: Canonical PaymentOperation resource path.
+      required: true
+      schema:
+        type: string
+        pattern: '^/v1/operations/op_[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+    RetryAfter:
+      description: Suggested delay in seconds before retry or polling.
+      schema:
+        type: integer
+        minimum: 0
+    PollingRetryAfter:
+      description: Poll the accepted operation after one second.
+      required: true
+      schema:
+        type: integer
+        const: 1
+    IdempotentReplay:
+      description: Present with value true only when returning a stored result.
+      schema:
+        type: boolean
+        const: true
+    WWWAuthenticate:
+      description: Bearer authentication challenge supplied on merchant API 401 responses.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 500
+
+  responses:
+    PaymentCreated:
+      description: Payment committed. This may also be an exact stored replay.
+      headers:
+        Location:
+          $ref: '#/components/headers/PaymentLocation'
+        ETag:
+          $ref: '#/components/headers/PaymentETag'
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        Idempotent-Replay:
+          $ref: '#/components/headers/IdempotentReplay'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Payment'
+    OperationAccepted:
+      description: >-
+        Provider-backed command durably accepted. This does not mean the
+        provider action succeeded and may be an exact stored replay.
+      headers:
+        Location:
+          $ref: '#/components/headers/OperationLocation'
+        ETag:
+          $ref: '#/components/headers/OperationETag'
+        Retry-After:
+          $ref: '#/components/headers/PollingRetryAfter'
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        Idempotent-Replay:
+          $ref: '#/components/headers/IdempotentReplay'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentOperation'
+    PaymentFound:
+      description: Current committed Payment state.
+      headers:
+        ETag:
+          $ref: '#/components/headers/PaymentETag'
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Payment'
+    OperationFound:
+      description: Current committed PaymentOperation state.
+      headers:
+        ETag:
+          $ref: '#/components/headers/OperationETag'
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentOperation'
+    PaymentsPage:
+      description: Merchant-scoped page of Payments.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentPage'
+    OperationsPage:
+      description: Merchant-scoped page of PaymentOperations.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OperationPage'
+    PaymentTimelineFound:
+      description: Ordered, bounded, merchant-safe history of one payment.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentTimeline'
+    NotModified:
+      description: Resource ETag still matches; no response body.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ResourceETag'
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+    ProviderWebhookAccepted:
+      description: >-
+        Valid provider evidence or a duplicate was durably recorded. No payment
+        state is returned.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+    Problem400Response:
+      description: The request is malformed or fails boundary validation.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem400'
+    MerchantProblem401Response:
+      description: Merchant bearer authentication is missing, invalid, or expired.
+      x-flowledger-required-headers: [WWW-Authenticate, X-Request-Id, X-Correlation-Id]
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WWWAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem401Merchant'
+    ProviderWebhookProblem401Response:
+      description: Provider signature or replay-window validation failed.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem401ProviderWebhook'
+    Problem403Response:
+      description: The authenticated principal lacks the required scope.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem403'
+    Problem404Response:
+      description: The requested resource is absent or not visible to the caller.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem404'
+    Problem409Response:
+      description: The request conflicts with committed or in-progress state.
+      x-flowledger-conditional-required-headers:
+        - when:
+            bodyJsonPointer: /code
+            equals: IDEMPOTENCY_REQUEST_IN_PROGRESS
+          header: Retry-After
+          required: true
+          schema:
+            type: integer
+            const: 1
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem409'
+    Problem422Response:
+      description: >-
+        The capture amount is below the bound fee policy's minimum capture
+        amount. A fee policy with a fixed component cannot price a capture below
+        that bound, so this is a configuration boundary rather than a state
+        conflict and is not reported as 409.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem422'
+    Problem412Response:
+      description: The supplied Payment version precondition is stale.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem412'
+    Problem413Response:
+      description: The request body exceeds the configured bound.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem413'
+    Problem415Response:
+      description: The request media type is not supported.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem415'
+    Problem429Response:
+      description: The caller exceeded an API rate limit.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem429'
+    Problem500Response:
+      description: An unexpected internal error occurred before durable acceptance.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem500'
+    Problem503Response:
+      description: The API cannot durably accept or serve the request.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem503'
+
+  schemas:
+    PaymentId:
+      type: string
+      pattern: '^pay_[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+      examples: [pay_01ARZ3NDEKTSV4RRFFQ69G5FAV]
+    OperationId:
+      type: string
+      pattern: '^op_[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+      examples: [op_01ARZ3NDEKTSV4RRFFQ69G5FAW]
+    RequestId:
+      type: string
+      pattern: '^req_[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+      examples: [req_01ARZ3NDEKTSV4RRFFQ69G5FAX]
+    CorrelationId:
+      type: string
+      pattern: '^[A-Za-z0-9._:-]{16,128}$'
+      examples: [cor_01ARZ3NDEKTSV4RRFFQ69G5FAY]
+    IdempotencyKey:
+      type: string
+      pattern: '^[A-Za-z0-9._:-]{16,128}$'
+      examples: [0192f4e7-8b30-7c83-b462-c0d5fe8f132a]
+    ProviderName:
+      type: string
+      pattern: '^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$'
+      maxLength: 63
+      examples: [fake-provider]
+    PaymentETag:
+      type: string
+      pattern: '^"payment-pay_[0-7][0-9A-HJKMNP-TV-Z]{25}-v[1-9][0-9]*"$'
+      examples: ['"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v1"']
+    OperationETag:
+      type: string
+      pattern: '^"operation-op_[0-7][0-9A-HJKMNP-TV-Z]{25}-v[1-9][0-9]*"$'
+      examples: ['"operation-op_01ARZ3NDEKTSV4RRFFQ69G5FAW-v1"']
+    AmountMinor:
+      type: string
+      pattern: '^(?:0|[1-9][0-9]{0,11}|1000000000000)$'
+      examples: ['0', '10000']
+    PositiveAmountMinor:
+      type: string
+      pattern: '^(?:[1-9][0-9]{0,11}|1000000000000)$'
+      examples: ['10000']
+    Currency:
+      type: string
+      const: USD
+    Timestamp:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$'
+      description: UTC RFC 3339 timestamp with exactly millisecond precision and a Z suffix.
+    PositiveMoney:
+      type: object
+      additionalProperties: false
+      required: [amountMinor, currency]
+      properties:
+        amountMinor:
+          $ref: '#/components/schemas/PositiveAmountMinor'
+        currency:
+          $ref: '#/components/schemas/Currency'
+    CreatePaymentRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, paymentMethodRef]
+      properties:
+        amount:
+          $ref: '#/components/schemas/PositiveMoney'
+        paymentMethodRef:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '^[A-Za-z0-9._:-]+$'
+          description: >-
+            Opaque provider-issued sandbox token. Raw card or bank credentials
+            are prohibited.
+          examples: [pm_sandbox_123]
+        provider:
+          $ref: '#/components/schemas/ProviderName'
+    EmptyRequest:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    AmountCommandRequest:
+      type: object
+      additionalProperties: false
+      required: [amount]
+      properties:
+        amount:
+          $ref: '#/components/schemas/PositiveMoney'
+    Payment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - currency
+        - provider
+        - requestedAmountMinor
+        - authorizedAmountMinor
+        - capturedAmountMinor
+        - refundedAmountMinor
+        - voidedAmountMinor
+        - reservedRefundAmountMinor
+        - unresolvedRefundCount
+        - authorizationOutcome
+        - summaryStatus
+        - activeExclusiveOperationId
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/PaymentId'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        provider:
+          $ref: '#/components/schemas/ProviderName'
+        requestedAmountMinor:
+          $ref: '#/components/schemas/PositiveAmountMinor'
+        authorizedAmountMinor:
+          $ref: '#/components/schemas/AmountMinor'
+        capturedAmountMinor:
+          $ref: '#/components/schemas/AmountMinor'
+        refundedAmountMinor:
+          $ref: '#/components/schemas/AmountMinor'
+        voidedAmountMinor:
+          $ref: '#/components/schemas/AmountMinor'
+        reservedRefundAmountMinor:
+          allOf:
+            - $ref: '#/components/schemas/AmountMinor'
+          description: >-
+            Value held by refund operations that are accepted but not yet
+            resolved. Not confirmed money. Remaining refundable value is
+            capturedAmountMinor - refundedAmountMinor - reservedRefundAmountMinor.
+        unresolvedRefundCount:
+          type: integer
+          minimum: 0
+          description: >-
+            Number of refund operations currently unresolved. Refunds may be in
+            flight concurrently; the refundable amount is the only limit.
+        authorizationOutcome:
+          type: string
+          enum: [NOT_REQUESTED, AUTHORIZED, DECLINED, CANCELED, EXPIRED]
+        summaryStatus:
+          type: string
+          description: Display-only derived status; never authorizes a command.
+          enum:
+            - REQUIRES_REVIEW
+            - OUTCOME_UNKNOWN
+            - PROCESSING
+            - REFUNDED
+            - PARTIALLY_REFUNDED
+            - CAPTURED
+            - PARTIALLY_CAPTURED
+            - CANCELED
+            - EXPIRED
+            - AUTHORIZED
+            - AUTHORIZATION_FAILED
+            - REQUIRES_AUTHORIZATION
+        activeExclusiveOperationId:
+          oneOf:
+            - $ref: '#/components/schemas/OperationId'
+            - type: 'null'
+          description: >-
+            Current unresolved AUTHORIZE, CAPTURE, or CANCEL operation, or null.
+            Deliberately excludes unresolved refunds, which may exist
+            concurrently; use unresolvedRefundCount for those.
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+    PaymentOperation:
+      type: object
+      additionalProperties: false
+      allOf:
+        - if:
+            required: [type]
+            properties:
+              type: { enum: [CAPTURE, REFUND] }
+          then:
+            properties:
+              feePolicyVersion: { type: integer, minimum: 1 }
+        - if:
+            required: [type]
+            properties:
+              type: { const: CAPTURE }
+          then:
+            properties:
+              feeAmountMinor: { $ref: '#/components/schemas/AmountMinor' }
+        - if:
+            required: [type]
+            properties:
+              type: { enum: [AUTHORIZE, CANCEL] }
+          then:
+            properties:
+              feePolicyVersion: { type: 'null' }
+              feeAmountMinor: { type: 'null' }
+        - if:
+            required: [status]
+            properties:
+              status: { const: SUCCEEDED }
+          then:
+            properties:
+              providerOperationId:
+                type: string
+                minLength: 1
+                maxLength: 255
+              resultCode: { type: 'null' }
+              resolvedAt:
+                $ref: '#/components/schemas/Timestamp'
+        - if:
+            required: [status]
+            properties:
+              status: { enum: [REJECTED, FAILED] }
+          then:
+            properties:
+              resultCode:
+                type: string
+                minLength: 1
+                maxLength: 128
+              resolvedAt:
+                $ref: '#/components/schemas/Timestamp'
+        # A refund's incremental fee reversal is computed when it confirms, not
+        # when it is accepted, so concurrent refunds cannot over-reverse the fee.
+        # It is therefore null until the operation resolves, and null forever if
+        # the refund was rejected or definitively failed.
+        - if:
+            required: [type, status]
+            properties:
+              type: { const: REFUND }
+              status: { const: SUCCEEDED }
+          then:
+            properties:
+              feeAmountMinor: { $ref: '#/components/schemas/AmountMinor' }
+        - if:
+            required: [type, status]
+            properties:
+              type: { const: REFUND }
+              status:
+                enum: [REQUESTED, PROCESSING, UNKNOWN, REQUIRES_REVIEW, REJECTED, FAILED]
+          then:
+            properties:
+              feeAmountMinor: { type: 'null' }
+        - if:
+            required: [status]
+            properties:
+              status: { enum: [REQUESTED, PROCESSING, UNKNOWN, REQUIRES_REVIEW] }
+          then:
+            properties:
+              resolvedAt: { type: 'null' }
+      required:
+        - id
+        - paymentId
+        - type
+        - amountMinor
+        - currency
+        - status
+        - provider
+        - providerOperationId
+        - resultCode
+        - feePolicyVersion
+        - feeAmountMinor
+        - version
+        - createdAt
+        - resolvedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/OperationId'
+        paymentId:
+          $ref: '#/components/schemas/PaymentId'
+        type:
+          type: string
+          enum: [AUTHORIZE, CAPTURE, CANCEL, REFUND]
+        amountMinor:
+          $ref: '#/components/schemas/PositiveAmountMinor'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        status:
+          type: string
+          enum:
+            - REQUESTED
+            - PROCESSING
+            - SUCCEEDED
+            - REJECTED
+            - FAILED
+            - UNKNOWN
+            - REQUIRES_REVIEW
+        provider:
+          $ref: '#/components/schemas/ProviderName'
+        providerOperationId:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 255
+        resultCode:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+        feePolicyVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+        feeAmountMinor:
+          oneOf:
+            - $ref: '#/components/schemas/AmountMinor'
+            - type: 'null'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        resolvedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+    PageInfo:
+      type: object
+      additionalProperties: false
+      allOf:
+        - if:
+            required: [hasMore]
+            properties:
+              hasMore: { const: true }
+          then:
+            properties:
+              nextCursor:
+                type: string
+                minLength: 1
+                maxLength: 4096
+          else:
+            properties:
+              nextCursor: { type: 'null' }
+      required: [nextCursor, hasMore]
+      properties:
+        nextCursor:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 4096
+        hasMore:
+          type: boolean
+    PaymentTimeline:
+      type: object
+      additionalProperties: false
+      required: [paymentId, paymentVersion, entries, truncated]
+      properties:
+        paymentId:
+          $ref: '#/components/schemas/PaymentId'
+        paymentVersion:
+          type: integer
+          minimum: 1
+        entries:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PaymentTimelineEntry'
+        truncated:
+          type: boolean
+          description: >-
+            True when the payment has more history than the bound. The omitted
+            entries are the newest; a payment in this state is an operator
+            investigation rather than a pagination case.
+    PaymentTimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [sequence, kind, occurredAt, paymentVersion, operationId, detail]
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          description: >-
+            Stable ordinal within one response, derived from database recorded
+            time plus a deterministic tiebreak. Not a durable identifier;
+            clients MUST NOT store it.
+        kind:
+          type: string
+          enum:
+            - PAYMENT_CREATED
+            - OPERATION_ACCEPTED
+            - PROVIDER_ATTEMPT
+            - PROVIDER_EVIDENCE
+            - OPERATION_RESOLVED
+            - RECONCILIATION_ACTIVITY
+            - DISCREPANCY
+            - AUTHORIZATION_EXPIRED
+            - LEDGER_POSTING
+            - SETTLEMENT
+            - WEBHOOK_DELIVERY
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        paymentVersion:
+          type: integer
+          minimum: 1
+        operationId:
+          oneOf:
+            - $ref: '#/components/schemas/OperationId'
+            - type: 'null'
+        detail:
+          type: object
+          description: >-
+            Closed per-kind object carrying only merchant-safe fields. It never
+            exposes provider secrets, raw provider payloads, payment-method
+            references, internal exception text, ledger account identities, or
+            another tenant's data. The per-kind shapes are enumerated in
+            docs/05-API_AND_IDEMPOTENCY_CONTRACT.md and are validated by the
+            semantic contract probes rather than by this schema, because the
+            variant set is keyed on kind.
+    PaymentPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Payment'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    OperationPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PaymentOperation'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    ProblemCode:
+      type: string
+      enum:
+        - INVALID_REQUEST
+        - INVALID_AMOUNT
+        - PROHIBITED_PAYMENT_DATA
+        - IDEMPOTENCY_KEY_REQUIRED
+        - INVALID_IDEMPOTENCY_KEY
+        - INVALID_CORRELATION_ID
+        - INVALID_CURSOR
+        - UNSUPPORTED_PROVIDER
+        - INVALID_PAYMENT_METHOD_REFERENCE
+        - AUTHENTICATION_REQUIRED
+        - INVALID_PROVIDER_SIGNATURE
+        - FORBIDDEN
+        - RESOURCE_NOT_FOUND
+        - IDEMPOTENCY_CONFLICT
+        - IDEMPOTENCY_REQUEST_IN_PROGRESS
+        - IDEMPOTENCY_KEY_EXPIRED
+        - ACTIVE_OPERATION_EXISTS
+        - INVALID_PAYMENT_STATE
+        - MONETARY_GUARD_FAILED
+        - PROVIDER_ROUTE_UNAVAILABLE
+        - PAYMENT_VERSION_MISMATCH
+        - REQUEST_TOO_LARGE
+        - UNSUPPORTED_MEDIA_TYPE
+        - CAPTURE_BELOW_MINIMUM
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required: [pointer, reason]
+      properties:
+        pointer:
+          type: string
+          description: Safe JSON Pointer identifying an invalid field.
+        reason:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{1,63}$'
+    ProblemBase:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - code
+        - detail
+        - instance
+        - requestId
+        - correlationId
+      properties:
+        type:
+          type: string
+          format: uri
+          examples: ['urn:flowledger:problem:idempotency-conflict']
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        detail:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        instance:
+          type: string
+          minLength: 1
+          maxLength: 500
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        correlationId:
+          $ref: '#/components/schemas/CorrelationId'
+        errors:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        resourceLocation:
+          type: string
+          maxLength: 500
+          description: >-
+            Safe original resource location, supplied only for an expired
+            idempotency replay when that resource still exists.
+    Problem:
+      x-flowledger-http-status-must-equal-body-status: true
+      oneOf:
+        - $ref: '#/components/schemas/Problem400'
+        - $ref: '#/components/schemas/Problem401Merchant'
+        - $ref: '#/components/schemas/Problem401ProviderWebhook'
+        - $ref: '#/components/schemas/Problem403'
+        - $ref: '#/components/schemas/Problem404'
+        - $ref: '#/components/schemas/Problem409'
+        - $ref: '#/components/schemas/Problem412'
+        - $ref: '#/components/schemas/Problem413'
+        - $ref: '#/components/schemas/Problem415'
+        - $ref: '#/components/schemas/Problem429'
+        - $ref: '#/components/schemas/Problem500'
+        - $ref: '#/components/schemas/Problem503'
+    Problem400:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 400 }
+            code:
+              enum: [INVALID_REQUEST, INVALID_AMOUNT, PROHIBITED_PAYMENT_DATA, IDEMPOTENCY_KEY_REQUIRED, INVALID_IDEMPOTENCY_KEY, INVALID_CORRELATION_ID, INVALID_CURSOR, UNSUPPORTED_PROVIDER, INVALID_PAYMENT_METHOD_REFERENCE]
+    Problem401Merchant:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 401 }
+            code: { const: AUTHENTICATION_REQUIRED }
+    Problem401ProviderWebhook:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 401 }
+            code: { const: INVALID_PROVIDER_SIGNATURE }
+    Problem403:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 403 }
+            code: { const: FORBIDDEN }
+    Problem404:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 404 }
+            code: { const: RESOURCE_NOT_FOUND }
+    Problem409:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 409 }
+            code:
+              enum: [IDEMPOTENCY_CONFLICT, IDEMPOTENCY_REQUEST_IN_PROGRESS, IDEMPOTENCY_KEY_EXPIRED, ACTIVE_OPERATION_EXISTS, INVALID_PAYMENT_STATE, MONETARY_GUARD_FAILED, PROVIDER_ROUTE_UNAVAILABLE]
+    Problem412:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 412 }
+            code: { const: PAYMENT_VERSION_MISMATCH }
+    Problem413:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 413 }
+            code: { const: REQUEST_TOO_LARGE }
+    Problem415:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 415 }
+            code: { const: UNSUPPORTED_MEDIA_TYPE }
+    Problem422:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 422 }
+            code: { const: CAPTURE_BELOW_MINIMUM }
+    Problem429:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 429 }
+            code: { const: RATE_LIMITED }
+    Problem500:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 500 }
+            code: { const: INTERNAL_ERROR }
+    Problem503:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            status: { const: 503 }
+            code: { const: SERVICE_UNAVAILABLE }

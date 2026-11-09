@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/common/provider-result-evidence.v1.schema.json",
+  "title": "Normalized provider result evidence v1",
+  "$ref": "#/$defs/providerEvidence",
+  "$defs": {
+    "providerEvidence": {
+      "type": "object",
+      "required": [
+        "source",
+        "providerObservedAt",
+        "receivedAt",
+        "providerEventId",
+        "redactedEvidenceRef"
+      ],
+      "properties": {
+        "source": {
+          "enum": ["API_RESPONSE", "PROVIDER_WEBHOOK", "RECONCILIATION"]
+        },
+        "providerObservedAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "providerEventId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "redactedEvidenceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "additionalProperties": false
+    },
+    "normalizedError": {
+      "type": "object",
+      "required": [
+        "category",
+        "code",
+        "retryDirective",
+        "retryAfterMs",
+        "safeMessage"
+      ],
+      "properties": {
+        "category": {
+          "enum": [
+            "BUSINESS_DECLINE",
+            "INVALID_REQUEST",
+            "AUTHENTICATION",
+            "PERMISSION",
+            "NOT_FOUND",
+            "CONFLICT",
+            "RATE_LIMITED",
+            "PROVIDER_UNAVAILABLE",
+            "TRANSPORT_PRE_SEND",
+            "TRANSPORT_AMBIGUOUS",
+            "MALFORMED_RESPONSE",
+            "UNSUPPORTED_OPERATION",
+            "ADAPTER_DEFECT"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "retryDirective": {
+          "enum": [
+            "DO_NOT_RETRY",
+            "RETRY_SAME_OPERATION",
+            "RECONCILE_FIRST"
+          ]
+        },
+        "retryAfterMs": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "safeMessage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": false
+    },
+    "noEffectProof": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "LOCAL_REJECTION_BEFORE_TRANSMISSION"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "providerCode"],
+          "properties": {
+            "kind": {
+              "const": "AUTHENTICATED_PROVIDER_REJECTION"
+            },
+            "providerCode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "observedAt"],
+          "properties": {
+            "kind": {
+              "const": "CONCLUSIVE_PROVIDER_LOOKUP_ABSENCE"
+            },
+            "observedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

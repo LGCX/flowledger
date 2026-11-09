@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/payment-authorization-expired.v1.schema.json",
+  "title": "Payment authorization expired event v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "payment.authorization.expired.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "payment" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "paymentId",
+        "operationId",
+        "provider",
+        "providerAccountId",
+        "providerPaymentId",
+        "providerAuthorizationId",
+        "totalsAfter",
+        "resolutionSource",
+        "evidence"
+      ],
+      "properties": {
+        "paymentId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "operationId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId" },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "providerAccountId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAccountId" },
+        "providerPaymentId": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "providerAuthorizationId": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "totalsAfter": { "$ref": "../common/payment-totals.v1.schema.json" },
+        "resolutionSource": { "enum": ["PROVIDER_WEBHOOK", "RECONCILIATION"] },
+        "evidence": { "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/providerEvidence" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

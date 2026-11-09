@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/registry-manifest.v1.schema.json",
+  "title": "FlowLedger message registry manifest v1",
+  "type": "object",
+  "required": ["manifestSchema", "registryVersion", "messages"],
+  "properties": {
+    "manifestSchema": {
+      "const": "registry-manifest.v1.schema.json"
+    },
+    "registryVersion": {
+      "const": 1
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["kind", "type", "schema"],
+        "properties": {
+          "kind": {
+            "enum": ["COMMAND", "EVENT"]
+          },
+          "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*\\.v[1-9][0-9]*$"
+          },
+          "schema": {
+            "type": "string",
+            "pattern": "^(commands|events)/[a-z0-9-]+\\.v[1-9][0-9]*\\.schema\\.json$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

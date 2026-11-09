@@ -1,0 +1,35 @@
+{
+  "manifestSchema": "registry-manifest.v1.schema.json",
+  "registryVersion": 1,
+  "messages": [
+    { "kind": "COMMAND", "type": "payment.operation.execute.v1", "schema": "commands/payment-operation-execute.v1.schema.json" },
+    { "kind": "COMMAND", "type": "payment.operation.reconcile.v1", "schema": "commands/payment-operation-reconcile.v1.schema.json" },
+    { "kind": "COMMAND", "type": "merchant.webhook.deliver.v1", "schema": "commands/merchant-webhook-deliver.v1.schema.json" },
+
+    { "kind": "EVENT", "type": "payment.created.v1", "schema": "events/payment-created.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.requested.v1", "schema": "events/payment-operation-requested.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.capture.requested.v1", "schema": "events/payment-operation-requested.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.cancellation.requested.v1", "schema": "events/payment-operation-requested.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.refund.requested.v1", "schema": "events/payment-operation-requested.v1.schema.json" },
+
+    { "kind": "EVENT", "type": "payment.authorization.succeeded.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.rejected.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.failed.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.expired.v1", "schema": "events/payment-authorization-expired.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.capture.succeeded.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.capture.rejected.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.capture.failed.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.cancellation.succeeded.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.cancellation.rejected.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.authorization.cancellation.failed.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.refund.succeeded.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.refund.rejected.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.refund.failed.v1", "schema": "events/payment-operation-terminal.v1.schema.json" },
+
+    { "kind": "EVENT", "type": "payment.operation.reconciliation.required.v1", "schema": "events/payment-operation-reconciliation-required.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.operation.review.required.v1", "schema": "events/payment-operation-review-required.v1.schema.json" },
+    { "kind": "EVENT", "type": "payment.discrepancy.detected.v1", "schema": "events/payment-discrepancy-detected.v1.schema.json" },
+    { "kind": "EVENT", "type": "ledger.transaction.posted.v1", "schema": "events/ledger-transaction-posted.v1.schema.json" },
+    { "kind": "EVENT", "type": "settlement.batch.posted.v1", "schema": "events/settlement-batch-posted.v1.schema.json" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/common/positive-money.v1.schema.json",
+  "title": "Positive money v1",
+  "type": "object",
+  "required": ["amountMinor", "currency"],
+  "properties": {
+    "amountMinor": {
+      "type": "string",
+      "pattern": "^([1-9][0-9]{0,11}|1000000000000)$",
+      "description": "Positive integer minor units no greater than 1000000000000; JavaScript number is forbidden."
+    },
+    "currency": {
+      "const": "USD"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/common/payment-totals.v1.schema.json",
+  "title": "Confirmed payment totals v1",
+  "type": "object",
+  "required": [
+    "requestedAmountMinor",
+    "authorizedAmountMinor",
+    "capturedAmountMinor",
+    "refundedAmountMinor",
+    "voidedAmountMinor",
+    "currency"
+  ],
+  "properties": {
+    "requestedAmountMinor": { "type": "string", "pattern": "^([1-9][0-9]{0,11}|1000000000000)$" },
+    "authorizedAmountMinor": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$" },
+    "capturedAmountMinor": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$" },
+    "refundedAmountMinor": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$" },
+    "voidedAmountMinor": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$" },
+    "currency": { "const": "USD" }
+  },
+  "additionalProperties": false
+}

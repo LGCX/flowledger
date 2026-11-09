@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/common/entity-ids.v1.schema.json",
+  "title": "FlowLedger entity identifiers v1",
+  "$defs": {
+    "entityId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,15}_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "maxLength": 43
+    },
+    "merchantId": {
+      "type": "string",
+      "pattern": "^mer_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "paymentId": {
+      "type": "string",
+      "pattern": "^pay_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "paymentOperationId": {
+      "type": "string",
+      "pattern": "^op_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerAttemptId": {
+      "type": "string",
+      "pattern": "^pat_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerAccountId": {
+      "type": "string",
+      "pattern": "^pacc_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "ledgerTransactionId": {
+      "type": "string",
+      "pattern": "^ltx_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "webhookDeliveryId": {
+      "type": "string",
+      "pattern": "^whd_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "webhookEndpointId": {
+      "type": "string",
+      "pattern": "^whe_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "reviewCaseId": {
+      "type": "string",
+      "pattern": "^case_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "settlementRunId": {
+      "type": "string",
+      "pattern": "^srn_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "settlementBatchId": {
+      "type": "string",
+      "pattern": "^sbt_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/payment-operation-review-required.v1.schema.json",
+  "title": "Payment operation review required event v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "payment.operation.review.required.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "payment" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "paymentId",
+        "operationType",
+        "provider",
+        "providerAccountId",
+        "providerAttemptId",
+        "providerIdempotencyKey",
+        "caseId",
+        "reason",
+        "evidenceRefs",
+        "automatedAttempts",
+        "reviewRequiredAt"
+      ],
+      "properties": {
+        "operationId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId" },
+        "paymentId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "operationType": { "enum": ["AUTHORIZE", "CAPTURE", "CANCEL", "REFUND"] },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "providerAccountId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAccountId" },
+        "providerAttemptId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAttemptId" },
+        "providerIdempotencyKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "caseId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/reviewCaseId" },
+        "reason": {
+          "enum": [
+            "AUTOMATED_RECONCILIATION_EXHAUSTED",
+            "PROVIDER_LOOKUP_UNAVAILABLE",
+            "OPERATOR_ESCALATION"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        },
+        "automatedAttempts": { "type": "integer", "minimum": 1 },
+        "reviewRequiredAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

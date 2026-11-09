@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/payment-operation-terminal.v1.schema.json",
+  "title": "Payment operation terminal event family v1",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": {
+          "enum": [
+            "payment.authorization.succeeded.v1",
+            "payment.authorization.rejected.v1",
+            "payment.authorization.failed.v1",
+            "payment.capture.succeeded.v1",
+            "payment.capture.rejected.v1",
+            "payment.capture.failed.v1",
+            "payment.authorization.cancellation.succeeded.v1",
+            "payment.authorization.cancellation.rejected.v1",
+            "payment.authorization.cancellation.failed.v1",
+            "payment.refund.succeeded.v1",
+            "payment.refund.rejected.v1",
+            "payment.refund.failed.v1"
+          ]
+        },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "payment" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId" },
+        "data": { "$ref": "#/$defs/data" }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.succeeded.v1",
+              "payment.capture.succeeded.v1",
+              "payment.authorization.cancellation.succeeded.v1",
+              "payment.refund.succeeded.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": {
+              "outcome": { "const": "SUCCEEDED" },
+              "providerPaymentId": { "type": "string", "minLength": 1, "maxLength": 255 },
+              "providerOperationId": { "type": "string", "minLength": 1, "maxLength": 255 },
+              "resultCode": { "type": "null" },
+              "normalizedError": { "type": "null" },
+              "noEffectProof": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.rejected.v1",
+              "payment.capture.rejected.v1",
+              "payment.authorization.cancellation.rejected.v1",
+              "payment.refund.rejected.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": {
+              "outcome": { "const": "REJECTED" },
+              "resultCode": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "normalizedError": {
+                "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/normalizedError"
+              },
+              "noEffectProof": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.failed.v1",
+              "payment.capture.failed.v1",
+              "payment.authorization.cancellation.failed.v1",
+              "payment.refund.failed.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": {
+              "outcome": { "const": "FAILED" },
+              "resultCode": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "normalizedError": {
+                "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/normalizedError"
+              },
+              "noEffectProof": {
+                "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/noEffectProof"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.capture.succeeded.v1",
+              "payment.refund.succeeded.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": {
+              "ledgerTransactionId": {
+                "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "data": {
+            "properties": {
+              "ledgerTransactionId": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": { "const": "payment.capture.succeeded.v1" }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": ["feeAmountMinor"],
+            "properties": {
+              "operationType": { "const": "CAPTURE" },
+              "feeReversalAmountMinor": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": { "const": "payment.refund.succeeded.v1" }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": ["feeReversalAmountMinor"],
+            "properties": {
+              "operationType": { "const": "REFUND" },
+              "feeAmountMinor": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.capture.succeeded.v1",
+              "payment.refund.succeeded.v1"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "data": {
+            "properties": {
+              "feeAmountMinor": false,
+              "feeReversalAmountMinor": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.succeeded.v1",
+              "payment.authorization.rejected.v1",
+              "payment.authorization.failed.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": { "operationType": { "const": "AUTHORIZE" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.capture.succeeded.v1",
+              "payment.capture.rejected.v1",
+              "payment.capture.failed.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": { "operationType": { "const": "CAPTURE" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.authorization.cancellation.succeeded.v1",
+              "payment.authorization.cancellation.rejected.v1",
+              "payment.authorization.cancellation.failed.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": { "operationType": { "const": "CANCEL" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "payment.refund.succeeded.v1",
+              "payment.refund.rejected.v1",
+              "payment.refund.failed.v1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "properties": { "operationType": { "const": "REFUND" } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "paymentId",
+        "operationType",
+        "outcome",
+        "provider",
+        "providerAccountId",
+        "providerIdempotencyKey",
+        "providerPaymentId",
+        "providerOperationId",
+        "amount",
+        "totalsAfter",
+        "resolutionSource",
+        "resultCode",
+        "ledgerTransactionId",
+        "evidence",
+        "normalizedError",
+        "noEffectProof"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentOperationId"
+        },
+        "paymentId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/paymentId"
+        },
+        "operationType": {
+          "enum": ["AUTHORIZE", "CAPTURE", "CANCEL", "REFUND"]
+        },
+        "outcome": {
+          "enum": ["SUCCEEDED", "REJECTED", "FAILED"]
+        },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "providerAccountId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/providerAccountId"
+        },
+        "providerIdempotencyKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "providerPaymentId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "providerOperationId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "providerAuthorizationId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "providerCaptureId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "amount": {
+          "$ref": "../common/positive-money.v1.schema.json"
+        },
+        "totalsAfter": {
+          "$ref": "../common/payment-totals.v1.schema.json"
+        },
+        "resolutionSource": {
+          "enum": ["API_RESPONSE", "PROVIDER_WEBHOOK", "RECONCILIATION"]
+        },
+        "resultCode": {
+          "type": ["string", "null"],
+          "maxLength": 128
+        },
+        "ledgerTransactionId": {
+          "oneOf": [
+            {
+              "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId"
+            },
+            { "type": "null" }
+          ]
+        },
+        "evidence": {
+          "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/providerEvidence"
+        },
+        "normalizedError": {
+          "oneOf": [
+            {
+              "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/normalizedError"
+            },
+            { "type": "null" }
+          ]
+        },
+        "noEffectProof": {
+          "oneOf": [
+            {
+              "$ref": "../common/provider-result-evidence.v1.schema.json#/$defs/noEffectProof"
+            },
+            { "type": "null" }
+          ]
+        },
+        "feeAmountMinor": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$"
+        },
+        "feeReversalAmountMinor": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,11}|1000000000000)$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

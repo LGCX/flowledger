@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/events/settlement-batch-posted.v1.schema.json",
+  "title": "Settlement batch posted event v1",
+  "description": "One settlement batch committed, moving a merchant's net confirmed value from clearing to payable. A batch is immutable and emits exactly one event, so aggregateVersion is always 1 and consumers MUST NOT apply payment-style version contiguity to it.",
+  "allOf": [
+    { "$ref": "../common/message-envelope.v1.schema.json" },
+    {
+      "properties": {
+        "kind": { "const": "EVENT" },
+        "type": { "const": "settlement.batch.posted.v1" },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "settlement_batch" },
+        "aggregateId": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/settlementBatchId" },
+        "aggregateVersion": { "const": 1 },
+        "orderingKey": { "$ref": "../common/entity-ids.v1.schema.json#/$defs/merchantId" },
+        "data": { "$ref": "#/$defs/data" }
+      },
+      "required": ["merchantId"]
+    }
+  ],
+  "$defs": {
+    "data": {
+      "type": "object",
+      "required": [
+        "settlementBatchId",
+        "settlementRunId",
+        "currency",
+        "cutoffAt",
+        "memberCount",
+        "netAmountMinor",
+        "ledgerTransactionId",
+        "postingKey",
+        "postedAt"
+      ],
+      "properties": {
+        "settlementBatchId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/settlementBatchId"
+        },
+        "settlementRunId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/settlementRunId"
+        },
+        "currency": { "const": "USD" },
+        "cutoffAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable eligibility bound read from the database clock at selection."
+        },
+        "memberCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of confirmed capture/refund movements this batch closed over. A batch always has at least one member."
+        },
+        "netAmountMinor": {
+          "type": "string",
+          "pattern": "^([1-9][0-9]{0,11}|1000000000000)$",
+          "description": "Positive net moved from merchant clearing to merchant payable. A zero or negative net defers the run and posts nothing, so it never produces this event."
+        },
+        "ledgerTransactionId": {
+          "$ref": "../common/entity-ids.v1.schema.json#/$defs/ledgerTransactionId"
+        },
+        "postingKey": {
+          "type": "string",
+          "pattern": "^settlement:sbt_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "description": "Exactly settlement:{settlementBatchId}."
+        },
+        "postedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

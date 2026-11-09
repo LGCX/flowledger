@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowledger.dev/schemas/common/message-envelope.v1.schema.json",
+  "title": "FlowLedger internal message envelope v1",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "type",
+    "schemaVersion",
+    "source",
+    "occurredAt",
+    "recordedAt",
+    "merchantId",
+    "aggregateType",
+    "aggregateId",
+    "aggregateVersion",
+    "orderingKey",
+    "correlationId",
+    "causationId",
+    "data"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable envelope ID used for business deduplication; never the Pub/Sub-generated messageId."
+    },
+    "kind": { "enum": ["COMMAND", "EVENT"] },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*\\.v[1-9][0-9]*$"
+    },
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "source": {
+      "type": "string",
+      "pattern": "^flowledger\\.[a-z][a-z0-9.]*$",
+      "maxLength": 100
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "merchantId": { "$ref": "entity-ids.v1.schema.json#/$defs/merchantId" },
+    "aggregateType": {
+      "type": "string",
+      "enum": [
+        "payment",
+        "payment_operation",
+        "ledger_transaction",
+        "webhook_delivery",
+        "settlement_batch"
+      ]
+    },
+    "aggregateId": { "$ref": "entity-ids.v1.schema.json#/$defs/entityId" },
+    "aggregateVersion": { "type": "integer", "minimum": 1 },
+    "orderingKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "correlationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{16,128}$"
+    },
+    "causationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+    },
+    "data": { "type": "object" }
+  },
+  "$defs": {
+    "entityId": {
+      "$ref": "entity-ids.v1.schema.json#/$defs/entityId"
+    }
+  },
+  "additionalProperties": false
+}
