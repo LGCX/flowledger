@@ -1279,7 +1279,38 @@ individual property lines, so three of the seven "impossible" constructions were
 compile for the *wrong* reason or not being suppressed at all. Directives now sit on the offending
 property line, and `noEffectProof`-style missing-property cases stay on the declaration line.
 
-**Next task:** `P01-T12`.
+## P01-T12 — Retry classification, observation normalization, backoff
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T13.
+
+```text
+TASK P01-T12 — NEEDS-REVIEW
+Acceptance criteria:
+  - every table row and expected-behaviour value is a test -> met: 16 observation rows, 6 message
+    classes, all documented backoff values
+  - property: 0.8*base <= delay < 1.2*base for every step and r in [0,1) -> met, 101 samples per step
+  - ReconciliationReason equals the schema enum -> deferred to P01-GATE as specified
+Tests added: packages/domain/src/retry.test.ts (41)
+  break-and-restore (each observed failing, then restored):
+    PROVIDER_5XX -> FAILED                        -> 3 tests fail (incl. the post-send invariant)
+    TIMEOUT_AFTER_SEND -> RETRYABLE_NO_EFFECT     -> 2 tests fail
+    jitter made additive-only                     -> 2 tests fail
+    exhaustion off by one                         -> 2 tests fail
+    retry hint no longer bounded                  -> 1 test fails
+    SCHEMA_INVALID retried instead of DLQ         -> 2 tests fail
+    baseline after restore                        -> 41 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text: none. A-07 (jitter magnitude) is stated in the module header.
+Contract/plan issues found: none.
+Next task: P01-T13.
+```
+
+**The task gate earned its keep here.** The commit was attempted on `main` because the branch had not
+been created after the P01-T11 merge, and `scripts/verify-task.mjs` refused with the CONVENTIONS §13
+message instead of committing. This is the third time the missing-branch mistake has appeared; the
+first two were caught by hand after the fact, and this one could not be.
+
+**Next task:** `P01-T13`.
 
 
 
