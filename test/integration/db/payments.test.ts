@@ -116,6 +116,8 @@ describe('constraint coverage', () => {
       'payments_capture_releases_remainder',
       'payments_version_positive',
       'payments_merchant_reference_key',
+      // Added by 0250, once operations exist to point at.
+      'payments_active_exclusive_operation_fkey',
     ]);
   });
 });
@@ -343,10 +345,10 @@ describe('immutability', () => {
     const deleted = await runMapped('DELETE FROM payments.payments WHERE id = $1', [id]);
     expect(((deleted as { error?: DomainError }).error as DomainError).code).toBe('IMMUTABLE_ROW');
 
+    // `payments.payment_operations` references this table, so PostgreSQL refuses the truncate itself
+    // (0A000) before the guard trigger is reached — the stronger, earlier refusal.
     const truncated = await runMapped('TRUNCATE payments.payments');
-    expect(((truncated as { error?: DomainError }).error as DomainError).code).toBe(
-      'IMMUTABLE_ROW',
-    );
+    expect((truncated as { error?: { code?: string } }).error?.code).toBe('0A000');
   });
 });
 

@@ -1736,7 +1736,46 @@ Next task: P02-T09.
 5. The tenant-visibility test created both payments for the same merchant and then asserted one of them
    was invisible.
 
-**Next task:** `P02-T09`.
+## P02-T09 — Migration 0250: payment operations, exclusion indexes, active-exclusive FK
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T10.
+
+```text
+TASK P02-T09 — NEEDS-REVIEW
+Acceptance criteria:
+  - every named constraint and unique index has a negative test -> met (26 constraints + 4 unique indexes)
+  - an operation cannot carry a different provider account or version than its payment -> met
+  - two unresolved exclusive operations impossible; multiple unresolved and succeeded refunds allowed -> met
+  - a refund fee effect exists only on success and cannot change afterwards -> met
+  - terminal rows reject every update; key/amount/type/binding/snapshot never change -> met
+  - the active pointer can reference only an operation of the same merchant and payment -> met
+Tests added: test/integration/db/payment-operations.test.ts (32); fixtures extended with
+  fixtureInsertOperation, fixtureUpdateOperation, fixtureCapturedPayment
+  break-and-restore (each observed failing, then restored) — all five bit:
+    REFUND added to the exclusive index (handoff) -> the three-unresolved-refunds case fails
+    terminal-row guard removed                   -> that case fails
+    provider_operation_id append-once removed    -> that case fails
+    success_reference check relaxed              -> that case fails
+    fee_effect check relaxed                     -> 2 cases fail
+    baseline after restore                       -> 32 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 247, e2e 0
+Deviations from the task text: none.
+Contract/plan issues found: none.
+Next task: P02-T10.
+```
+
+**A real bug in my own migration, found by running it:** the guard built its immutable-column list with
+`immutable_columns := immutable_columns || 'fee_effect_amount_minor'`, and `text[] || 'literal'` makes
+PostgreSQL parse the right operand as an *array* literal — every update failed with "malformed array
+literal". It needs `ARRAY[...]`.
+
+Also corrected before commit: the second-succeeded cases reused a helper whose payment already held a
+succeeded AUTHORIZE, and one INSERT had a `$6` placeholder with no value.
+
+The `payments.payments` coverage list gained `payments_active_exclusive_operation_fkey` (added here), and
+its TRUNCATE expectation moved to the FK's own refusal (0A000), which now fires before the trigger.
+
+**Next task:** `P02-T10`.
 
 
 

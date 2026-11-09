@@ -71,3 +71,153 @@ export async function fixtureUpdatePayment(
     [...columns.map((column) => set[column]), paymentId],
   );
 }
+
+export type FixtureOperationType = 'AUTHORIZE' | 'CAPTURE' | 'CANCEL' | 'REFUND';
+
+const TERMINAL = new Set(['SUCCEEDED', 'REJECTED', 'FAILED']);
+
+export interface FixtureOperationOptions {
+  readonly id?: string;
+  readonly status?: string;
+  readonly captureOperationId?: string;
+  readonly feeEffectAmountMinor?: bigint | null;
+  readonly feeEffectType?: string;
+  readonly providerOperationId?: string | null;
+  readonly resultCode?: string | null;
+  readonly notBefore?: Date | null;
+  readonly providerAccountVersion?: number;
+}
+
+/**
+ * Inserts an operation row in whatever state a test needs.
+ *
+ * Terminal statuses fill the columns the CHECKs require (`resolved_at`, evidence, source, and a
+ * provider reference or result code) so a test that is about, say, the capture-fee bound does not fail
+ * for a missing resolution first.
+ */
+export async function fixtureInsertOperation(
+  client: pg.ClientBase,
+  merchant: TestMerchant,
+  paymentId: string,
+  operation: { type: FixtureOperationType; amountMinor: bigint } & FixtureOperationOptions,
+): Promise<string> {
+  const id = operation.id ?? newId('op');
+  const status = operation.status ?? 'REQUESTED';
+  const terminal = TERMINAL.has(status);
+  const usesFeeSnapshot = operation.type === 'CAPTURE' || operation.type === 'REFUND';
+
+  const feeEffectType =
+    operation.feeEffectType ??
+    (operation.type === 'CAPTURE' ? 'CHARGE' : operation.type === 'REFUND' ? 'REFUND' : 'NONE');
+
+  const defaultFee =
+    operation.type === 'CAPTURE'
+      ? 30n
+      : operation.type === 'REFUND' && status === 'SUCCEEDED'
+        ? 30n
+        : null;
+  const feeEffectAmount =
+    operation.feeEffectAmountMinor === undefined ? defaultFee : operation.feeEffectAmountMinor;
+
+  const providerOperationId =
+    operation.providerOperationId === undefined
+      ? status === 'SUCCEEDED'
+        ? `provider-op-${id}`
+        : null
+      : operation.providerOperationId;
+
+  const resultCode =
+    operation.resultCode === undefined
+      ? status === 'REJECTED' || status === 'FAILED'
+        ? 'CARD_DECLINED'
+        : null
+      : operation.resultCode;
+
+  await client.query(
+    `INSERT INTO payments.payment_operations
+       (id, merchant_id, payment_id, type, amount_minor, status, provider_account_id,
+        provider_account_version, provider_idempotency_key, provider_operation_id, capture_operation_id,
+        fee_policy_id, fee_policy_version, fee_basis_points, fee_fixed_amount_minor,
+        fee_capture_rounding_mode, fee_refund_mode, fee_effect_type, fee_effect_amount_minor,
+        result_code, resolution_source, resolution_evidence_id, not_before, resolved_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+             $12, $13, $14, $15, $16, $17, $18, $19,
+             $20, $21, $22, $23, $24)`,
+    [
+      id,
+      merchant.merchantId,
+      paymentId,
+      operation.type,
+      operation.amountMinor.toString(),
+      status,
+      merchant.providerAccountId,
+      operation.providerAccountVersion ?? merchant.providerAccountVersion,
+      `flowledger:test:fake-provider:${id}`,
+      providerOperationId,
+      operation.captureOperationId ?? null,
+      usesFeeSnapshot ? merchant.feePolicyId : null,
+      usesFeeSnapshot ? merchant.feePolicyVersion : null,
+      usesFeeSnapshot ? 290 : null,
+      usesFeeSnapshot ? 30n.toString() : null,
+      usesFeeSnapshot ? 'HALF_UP' : null,
+      usesFeeSnapshot ? 'PROPORTIONAL' : null,
+      feeEffectType,
+      feeEffectAmount === null ? null : feeEffectAmount.toString(),
+      resultCode,
+      terminal ? 'API_RESPONSE' : null,
+      terminal ? newId('pev') : null,
+      operation.notBefore ?? null,
+      terminal ? new Date() : null,
+    ],
+  );
+
+  return id;
+}
+
+/** Updates an operation as the owner, incrementing `version` as the guard requires. */
+export async function fixtureUpdateOperation(
+  client: pg.ClientBase,
+  operationId: string,
+  set: Readonly<Record<string, unknown>>,
+): Promise<void> {
+  const columns = Object.keys(set);
+  const assignments = columns.map((column, index) => `${column} = $${String(index + 1)}`);
+  assignments.push('version = version + 1');
+
+  await client.query(
+    `UPDATE payments.payment_operations SET ${assignments.join(', ')} WHERE id = $${String(columns.length + 1)}`,
+    [...columns.map((column) => set[column]), operationId],
+  );
+}
+
+/**
+ * A payment with a succeeded AUTHORIZE and a succeeded CAPTURE, in an internally consistent state:
+ * `authorized = captured = amountMinor`, capture released no remainder, and the pointer cleared.
+ */
+export async function fixtureCapturedPayment(
+  client: pg.ClientBase,
+  merchant: TestMerchant,
+  amountMinor: bigint,
+): Promise<{ paymentId: string; authorizeId: string; captureId: string }> {
+  const paymentId = await fixtureInsertPayment(client, merchant, {
+    requestedAmountMinor: amountMinor,
+  });
+  const authorizeId = await fixtureInsertOperation(client, merchant, paymentId, {
+    type: 'AUTHORIZE',
+    amountMinor,
+    status: 'SUCCEEDED',
+  });
+  const captureId = await fixtureInsertOperation(client, merchant, paymentId, {
+    type: 'CAPTURE',
+    amountMinor,
+    status: 'SUCCEEDED',
+  });
+
+  await fixtureUpdatePayment(client, paymentId, {
+    authorized_amount_minor: amountMinor,
+    captured_amount_minor: amountMinor,
+    authorization_outcome: 'AUTHORIZED',
+  });
+
+  return { paymentId, authorizeId, captureId };
+}
