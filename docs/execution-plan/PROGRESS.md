@@ -2127,3 +2127,51 @@ hash form; `api` function owner (CONVENTIONS §7); DLQ failure classes (R16); P1
 0293. None blocks P03.
 
 **Next task:** `P03-T01`.
+
+## P03-T01 — Ledger SQL helpers: ID generator, JCS serializer, bucket derivation
+
+**Status:** `NEEDS-REVIEW` — all gates green; awaiting owner `approve` before merging.
+
+```text
+TASK P03-T01 — NEEDS-REVIEW
+Commit: <sha> on task/p03-t01-ledger-helpers (owner approves, then fast-forward; not pushed)
+Acceptance criteria:
+  - all eight golden vectors at N=32, N=7, N=1 -> met (independently reproduced before writing SQL)
+  - bucket_for_payment IMMUTABLE; rejects non-pay ID and N=0/101/-1 with the listed rules -> met
+  - generate_id: 1000 calls match the §6 regex and are all distinct -> met
+  - jcs sorts keys in C order, no insignificant whitespace, rejects non-integers and non-ASCII keys -> met
+    (including `1.0`, and `1e3` → 1000 with a TypeScript parity assertion)
+  - PUBLIC and fl_api cannot execute any of the three functions -> met (both, executed)
+Tests added: test/integration/ledger/helpers.test.ts (44 cases; failed-first observed: 40 failing before
+  the migration existed, for the right reason — functions absent, then "permission denied for function")
+  break-and-restore (each observed failing, then restored):
+    bucket reads only the last character (handoff)  -> 4 failures; N=32 still right, N=7 wrong, exactly
+                                                       as the handoff predicted
+    bucket_for_payment declared STABLE              -> the IMMUTABLE case fails
+    jcs accepts fractional numbers                  -> 3 rejection cases fail (1.5, 1.0, nested 1.5)
+    baseline after restore                          -> 44 passing
+Commands: scripts/verify-task.mjs --full -> check 0, build 0, integration 462/462 (20 files), e2e 0
+  pnpm verify:ledger -> not yet available (created by P03-T11)
+Deviations from the task text:
+  1. The fast-check property is a seeded xorshift. `fast-check` is a dependency of packages/domain and
+     packages/testkit only, so the integration project cannot import it, and this task's Files list
+     forbids adding a dependency. Coverage is the same in substance: 500 IDs drawn from the full 130-bit
+     space, compared against a decoder written separately from the SQL. Convert to fast-check when a
+     task legitimately touches package.json.
+  2. `SET LOCAL ROLE ledger_function_owner` grants EXECUTE to fl_migration_owner AFTER the ownership
+     transfer. Transferring ownership removes the previous owner's implicit EXECUTE, so the grant placed
+     before it is inert and every migration-owner call fails with "permission denied for function".
+     The grant must come from the new owner, since only the owner can grant.
+Contract/plan issues found: none. The three rulings (USAGE-on-schema order, search_path lists, jcs
+  numbers) matched reality on every point; the USAGE grant was load-bearing exactly as predicted.
+Next task: P03-T02 (dependencies satisfied: yes)
+```
+
+Two notes for whoever reads this next:
+
+- The `1e3` ruling was right, and it is worth keeping the *reason*: `jsonb` normalises the exponent at
+  cast time, so `jcs` never sees it. `1.0` is the case that actually matters, because `jsonb` preserves
+  the scale and prints `1.0` where the TypeScript canonicaliser prints `1` — emitting it would have made
+  a SQL hash and a TypeScript hash of the same document disagree.
+- The `GRANT USAGE ON SCHEMA ledger` ruling was load-bearing in a way the plan predicted precisely: with
+  it absent, `fl_operator_readonly` gets `42501` even though `GRANT EXECUTE` is present.
