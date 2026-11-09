@@ -152,9 +152,9 @@
    - **Envelope verification**: `CAPTURE` → `type = 'payment.capture.requested.v1'`, `data.feePolicyVersion = policy.version`, `data.feeAmountMinor = v_fee::text`; `REFUND` → `type = 'payment.refund.requested.v1'` and `data` has neither `feePolicyVersion` nor `feeAmountMinor` (schema forbids them).
 3. No new grants beyond `GRANT SELECT ON payments.fee_policies TO payments_function_owner` (no-op if present).
 
-**Expected behavior** (policy: 290 bp, fixed 30, minimum 30)
+**Expected behavior** (policy: 290 bp, fixed 30, minimum 50 — the P02 fixture default and the dev seed)
 - Capture 10 000 of authorized 10 000 → fee `floor((10000*290+5000)/10000)+30 = 320`; operation `fee_effect_amount_minor = 320`, `fee_policy_version` = payment-bound version; event `feeAmountMinor:"320"`.
-- Capture 29 → `CAPTURE_BELOW_MINIMUM`, `DETAIL {"minimumCaptureAmountMinor":"30"}`, zero rows.
+- Capture 49 → `CAPTURE_BELOW_MINIMUM`, `DETAIL {"minimumCaptureAmountMinor":"50"}`, zero rows.
 - Policy (0 bp, fixed 500, minimum 500), capture 500 → accepted, fee 500 = gross.
 - Captured 10 000, refunded 0: refunds 4 000 + 4 000 accepted (reserved 8 000, count 2); refund 2 001 → `MONETARY_GUARD_FAILED`; refund 2 000 → accepted (reserved 10 000).
 - Capture while a refund is unresolved → `ACTIVE_OPERATION_EXISTS`; refund while a capture is unresolved → `ACTIVE_OPERATION_EXISTS`.
@@ -228,7 +228,7 @@
          4. Reply after commit: `202`, `Location`/`ETag`/`Content-Type`/`X-Correlation-Id` from stored `response_headers`, `Retry-After: 1`, `Idempotent-Replay: true` on replay, body = stored text verbatim.
 4. `problem-filter.ts`: `CAPTURE_BELOW_MINIMUM` → `detail = 'Capture amount must be at least ' + DETAIL.minimumCaptureAmountMinor + ' minor units.'`; `IDEMPOTENCY_KEY_EXPIRED` → `resourceLocation` from DETAIL (already in P04); `INVALID_PAYMENT_STATE`, `ACTIVE_OPERATION_EXISTS`, `MONETARY_GUARD_FAILED`, `PAYMENT_VERSION_MISMATCH`, `RESOURCE_NOT_FOUND` → their codes with default detail; every `INTERNAL_*` code (incl. `INTERNAL_STALE_SNAPSHOT` after 3 attempts) → `500 INTERNAL_ERROR`.
 
-**Expected behavior** — See P05-T01/T02 expected behavior mapped to HTTP; `POST …/authorizations` with body `{"x":1}` → `400 INVALID_REQUEST`; capture of `"29"` with minimum 30 → `422 CAPTURE_BELOW_MINIMUM`, detail mentions `30`.
+**Expected behavior** — See P05-T01/T02 expected behavior mapped to HTTP; `POST …/authorizations` with body `{"x":1}` → `400 INVALID_REQUEST`; capture of `"49"` with minimum 50 → `422 CAPTURE_BELOW_MINIMUM`, detail mentions `50`.
 
 **Acceptance criteria**
 - [ ] `202` is emitted only after commit (the P04 `commit` fault point yields `500`, never `202`).
