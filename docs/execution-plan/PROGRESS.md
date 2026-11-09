@@ -509,7 +509,53 @@ Next task: P00-T09.
 2. Rule 5 compiled schemas individually, so legitimate relative `$ref`s looked unresolved;
    siblings must be registered before any is compiled.
 
-**Next task:** `P00-T09`.
+## P00-T09 — OpenAPI, example, problem-code, and prose-example validation
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P00-T10.
+
+```text
+TASK P00-T09 — NEEDS-REVIEW
+Commit: 46c66c1 on task/p00-t09-openapi-prose
+Acceptance criteria:
+  - OpenAPI validates; all local refs resolve -> met (SwaggerParser.validate, 3.1)
+  - every OpenAPI example validates; mutated example fails with its JSON pointer -> met
+  - problem-code parity and per-status membership exact -> met (27 codes)
+  - manifest count equals JSON blocks in both docs -> met (2 + 9 = 11)
+Tests added: openapi.test.ts (8), prose-examples.test.ts (13),
+             fixtures/prose-examples.json (11 entries)
+  break-and-restore (each observed failing, then restored, tree verified clean):
+    PaymentId.examples = ['pay_BAD']        -> "every example validates" fails
+    docs/05 table code typo'd               -> parity + reachability fail
+    Problem409 dropped a listed code        -> reachability fails
+    extension keywords unregistered         -> "every component compiles" fails
+    `truncated` removed from timeline block -> PaymentTimeline prose example fails (R-02)
+    new prose block with no manifest entry  -> manifest coverage fails
+    baseline after restore                  -> 8 + 13 passing
+Commands: pnpm check 0 | integration 0 | e2e 0 | build 0
+          contract lane: 9 files, 122 tests
+          clean clone: install 0, check 0, build 0
+Deviations from the task text:
+  1. The example walker runs over the parsed raw document only, not also over
+     `openApiComponentsSchema`. The raw document contains `components.schemas`, so the
+     coverage is identical, but walking both would report the same component example twice
+     under two pointers and break the "exactly one failure" acceptance criterion.
+  2. `SwaggerParser.validate` and `SwaggerParser.parse` are both called: the first for
+     structural validation, the second for the unresolved document that keeps original
+     `$ref` strings for pointer-accurate reporting.
+Contract/plan issues found: none.
+Next task: P00-T10.
+```
+
+**Notes worth keeping:**
+1. `examples` means two different things in one document: a JSON Schema `examples` is an
+   array of instance values; an OpenAPI media-type/parameter `examples` is a name-keyed map
+   of Example Objects holding `value`. The walker handles both because doc 05's request and
+   response examples will eventually live in the media-type form.
+2. The `truncated` field in the docs/05 timeline example (Step 1, R-02) is now load-bearing:
+   removing it fails `PaymentTimeline`. That was a live contract defect, not a style nit.
+
+**Next task:** `P00-T10`.
+
 
 
 
