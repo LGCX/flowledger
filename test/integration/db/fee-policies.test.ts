@@ -152,14 +152,12 @@ describe('the fee-within-minimum guarantee', () => {
   });
 
   /**
-   * `fee_policies_minimum_capture` is redundant by construction, and this test says so instead of
-   * pretending otherwise. If `fee_at(minimum) <= minimum` holds and the fee includes the fixed
-   * component, then `minimum >= fixed` follows, so any row satisfying
-   * `fee_policies_fee_within_minimum` also satisfies `fee_policies_minimum_capture`. Relaxing the
-   * latter to `>= 1` therefore changes nothing observable — verified by trying exactly that.
-   *
-   * The check stays as a readable statement of intent and as a guard should the fee formula ever stop
-   * including the fixed component; it is not what rejects this row.
+   * The *fixed* half of `fee_policies_minimum_capture` (minimum >= fixed) is implied by
+   * `fee_policies_fee_within_minimum`: the fee at the minimum includes the fixed component. The `>= 1`
+   * half is not. With `fixed = 0` and `minimum = 0` the fee-within-minimum check evaluates
+   * `(0 * bp + 5000) / 10000 + 0 <= 0`, which is true, so only `fee_policies_minimum_capture` refuses
+   * that row (docs/02 §Minimum capture amount: "at least 1"). The P02-T07 break that relaxed the check
+   * to `>= 1` kept exactly that half, which is why it could not fail; the case below pins it.
    */
   it('rejects a minimum below the fixed component, via the fee-within-minimum check', async () => {
     const merchantId = await bareMerchant();
@@ -168,6 +166,18 @@ describe('the fee-within-minimum guarantee', () => {
     );
     expect((error as { code?: string }).code).toBe('23514');
     expect((error as { constraint?: string }).constraint).toBe('fee_policies_fee_within_minimum');
+  });
+
+  it('rejects minimum 0 with a zero fixed component, via the minimum-capture check alone', async () => {
+    const merchantId = await bareMerchant();
+    const error = await insertPolicy({
+      merchantId,
+      basisPoints: 290,
+      fixedAmountMinor: 0n,
+      minimumCaptureAmountMinor: 0n,
+    }).catch((caught: unknown) => caught);
+    expect((error as { code?: string }).code).toBe('23514');
+    expect((error as { constraint?: string }).constraint).toBe('fee_policies_minimum_capture');
   });
 
   it('rejects minimum 0', async () => {

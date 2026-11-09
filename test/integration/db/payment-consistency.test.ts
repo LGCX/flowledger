@@ -327,6 +327,33 @@ describe('confirmed totals', () => {
     expectConsistencyFailure(result, 'authorization_outcome');
   });
 
+  // The converse of the case above, and the only check that refuses it: a succeeded AUTHORIZE with
+  // the payment left NOT_REQUESTED satisfies every CHECK on payments (all totals zero).
+  it('fails when a succeeded authorization exists but the outcome is still NOT_REQUESTED', async () => {
+    const m = await merchant();
+    const result = await inTransaction(async (client) => {
+      const paymentId = await fixtureInsertPayment(client, m, { requestedAmountMinor: 1_000n });
+      await fixtureInsertOperation(client, m, paymentId, {
+        type: 'AUTHORIZE',
+        amountMinor: 1_000n,
+        status: 'SUCCEEDED',
+      });
+    });
+    expectConsistencyFailure(result, 'authorization_outcome');
+  });
+
+  it('fails when the outcome claims CANCELED with no succeeded CANCEL', async () => {
+    const m = await merchant();
+    const result = await inTransaction(async (client) => {
+      const { paymentId } = await consistentAuthorized(client, m, 1_000n);
+      await fixtureUpdatePayment(client, paymentId, {
+        authorization_outcome: 'CANCELED',
+        voided_amount_minor: 1_000n,
+      });
+    });
+    expectConsistencyFailure(result, 'canceled');
+  });
+
   it('fails when a succeeded CANCEL exists but the outcome is not CANCELED', async () => {
     const m = await merchant();
     const result = await inTransaction(async (client) => {
