@@ -46,11 +46,13 @@ export interface Acceptance {
 
 function fail(
   code:
+    | 'INVALID_AMOUNT'
     | 'ACTIVE_OPERATION_EXISTS'
     | 'INVALID_PAYMENT_STATE'
     | 'MONETARY_GUARD_FAILED'
     | 'CAPTURE_BELOW_MINIMUM',
   reason:
+    | 'AMOUNT_NOT_POSITIVE'
     | 'EXCLUSIVE_OPERATION_UNRESOLVED'
     | 'REFUND_UNRESOLVED'
     | 'GUARD_FAILED'
@@ -72,6 +74,15 @@ export function acceptCommand(
   request: CommandRequest,
   newOperationId: OperationId,
 ): Result<Acceptance> {
+  // 0. Every command amount is positive (docs/03, docs/05 `PositiveMoney`). `MinorUnits` admits 0, so
+  //    the API schema is not the only line: a zero refund would otherwise be accepted with a count of
+  //    one and a reservation of zero, breaking `(reservedRefund = 0) = (unresolvedRefundCount = 0)`, and
+  //    a zero capture would be misreported as CAPTURE_BELOW_MINIMUM. It is a malformed request, so it
+  //    precedes every state guard.
+  if ((request.type === 'CAPTURE' || request.type === 'REFUND') && request.amount <= 0n) {
+    return fail('INVALID_AMOUNT', 'AMOUNT_NOT_POSITIVE');
+  }
+
   // 1. An unresolved exclusive operation blocks every new command, refunds included: a refund
   //    against a payment whose capture is still in flight would be sized from totals that may yet
   //    change. The reverse direction — an unresolved refund blocking exclusive work — is guard 2.

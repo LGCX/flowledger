@@ -570,3 +570,33 @@ describe('acceptance preserves the invariants', () => {
     }
   });
 });
+
+describe('audit regressions (P02 review)', () => {
+  it('refuses a zero refund before any state guard', () => {
+    const result = acceptCommand(
+      capturedPayment(),
+      [],
+      { type: 'REFUND', amount: U('0'), captureFeeSnapshot: SNAPSHOT },
+      nextOpId(),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(`${result.error.code}/${result.error.reason}`).toBe(
+      'INVALID_AMOUNT/AMOUNT_NOT_POSITIVE',
+    );
+  });
+
+  it('refuses a zero capture as INVALID_AMOUNT, not CAPTURE_BELOW_MINIMUM', () => {
+    const result = acceptCommand(
+      payment({ authorized: U('10000'), authorizationOutcome: 'AUTHORIZED' }),
+      [op({ type: 'AUTHORIZE', status: 'SUCCEEDED' })],
+      { type: 'CAPTURE', amount: U('0'), feePolicy: POLICY },
+      nextOpId(),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(`${result.error.code}/${result.error.reason}`).toBe(
+      'INVALID_AMOUNT/AMOUNT_NOT_POSITIVE',
+    );
+  });
+});

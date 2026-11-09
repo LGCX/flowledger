@@ -139,7 +139,13 @@ function applyEffects(
       nextPayment = {
         ...base,
         authorized: succeeded ? amount : payment.authorized,
-        authorizationOutcome: succeeded ? 'AUTHORIZED' : 'DECLINED',
+        // docs/03 §Authorization outcomes: a definitive decline sets DECLINED, but a definitive
+        // no-effect failure "leaves confirmed fields unchanged". FAILED is not a decline.
+        authorizationOutcome: succeeded
+          ? 'AUTHORIZED'
+          : evidence.outcome === 'REJECTED'
+            ? 'DECLINED'
+            : payment.authorizationOutcome,
       };
       break;
 
@@ -156,13 +162,14 @@ function applyEffects(
       break;
 
     case 'REFUND': {
-      if (operation.feeSnapshot === null) {
-        // A refund accepted without a capture snapshot cannot compute its reversal.
-        return err<Transition>(illegal({ constraint: 'refund requires a fee snapshot' }));
-      }
       const released = minorUnits(payment.reservedRefund - operation.amount);
       const count = payment.unresolvedRefundCount - 1;
       if (succeeded) {
+        if (operation.feeSnapshot === null) {
+          // Only a success computes a reversal. A rejected or failed refund must still release its
+          // reservation, so it does not need the snapshot.
+          return err<Transition>(illegal({ constraint: 'refund requires a fee snapshot' }));
+        }
         feeEffect = incrementalFeeReversal({
           captureFee: operation.feeSnapshot.captureFee,
           captureGross: operation.feeSnapshot.captureGross,

@@ -16,6 +16,7 @@ import {
   type OperationType,
   type PaymentState,
   checkPaymentInvariants,
+  deriveSummaryStatus,
 } from './payment.js';
 import {
   type ResolutionEvidence,
@@ -167,7 +168,10 @@ describe('resolution table', () => {
         expect(result.payment.authorizationOutcome).toBe('AUTHORIZED');
       } else {
         expect(result.payment.authorized).toBe(0n);
-        expect(result.payment.authorizationOutcome).toBe('DECLINED');
+        // REJECTED is a definitive decline; FAILED leaves confirmed fields unchanged (docs/03).
+        expect(result.payment.authorizationOutcome).toBe(
+          outcome === 'REJECTED' ? 'DECLINED' : state.payment.authorizationOutcome,
+        );
       }
       expect(result.payment.activeExclusiveOperationId).toBeNull();
     }
@@ -548,5 +552,50 @@ describe('invariants hold after every transition', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(checkPaymentInvariants(result.value, [])).toEqual([]);
+  });
+});
+
+describe('audit regressions (P02 review)', () => {
+  it('leaves the authorization outcome unchanged on a definitive no-effect FAILED', () => {
+    // docs/03 §Authorization outcomes: "Leave confirmed fields unchanged" — FAILED is not a decline.
+    const authorize = op({ type: 'AUTHORIZE', status: 'PROCESSING' });
+    const before = payment({ activeExclusiveOperationId: authorize.id });
+    const result = applied(resolveOperation(before, authorize, { outcome: 'FAILED' }));
+
+    expect(result.payment.authorizationOutcome).toBe('NOT_REQUESTED');
+    expect(result.payment.authorized).toBe(0n);
+    expect(result.payment.activeExclusiveOperationId).toBeNull();
+    // The A-05 rule is now reachable: the last attempt failing is what makes the summary failed.
+    expect(deriveSummaryStatus(result.payment, [result.operation])).toBe('AUTHORIZATION_FAILED');
+  });
+
+  it('sets DECLINED on a definitive REJECTED', () => {
+    const authorize = op({ type: 'AUTHORIZE', status: 'PROCESSING' });
+    const before = payment({ activeExclusiveOperationId: authorize.id });
+    const result = applied(resolveOperation(before, authorize, { outcome: 'REJECTED' }));
+    expect(result.payment.authorizationOutcome).toBe('DECLINED');
+  });
+
+  it.each<['REJECTED' | 'FAILED']>([['REJECTED'], ['FAILED']])(
+    'releases a %s refund reservation even without a fee snapshot',
+    (outcome) => {
+      const refund = op({ type: 'REFUND', amount: U('1000'), status: 'PROCESSING' });
+      const before = capturedPayment({
+        voided: U('0'),
+        reservedRefund: U('1000'),
+        unresolvedRefundCount: 1,
+      });
+      const result = applied(resolveOperation(before, refund, { outcome }));
+      expect(result.payment.reservedRefund).toBe(0n);
+      expect(result.payment.unresolvedRefundCount).toBe(0);
+      expect(result.operation.feeEffect).toBeNull();
+    },
+  );
+
+  it('still refuses a SUCCEEDED refund without a fee snapshot', () => {
+    const refund = op({ type: 'REFUND', amount: U('1000'), status: 'PROCESSING' });
+    const before = capturedPayment({ reservedRefund: U('1000'), unresolvedRefundCount: 1 });
+    const result = resolveOperation(before, refund, { outcome: 'SUCCEEDED', amount: U('1000') });
+    expect(result.ok).toBe(false);
   });
 });
