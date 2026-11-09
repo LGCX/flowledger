@@ -36,6 +36,12 @@ regexes = [
   # whole `fl_test_*` shape was rejected for exactly that reason — it would blind the scan to a leaked
   # merchant credential, which is the case this file exists to catch.
   '''0123456789AB''',
+  # Lowercase variants used by the format-rejection tests: `0123456789ab` proves the credential locator
+  # CHECK rejects lowercase, and `01arz3ndektsv4rrffq69g5fav` does the same for the webhook endpoint key
+  # (P02-T05/T06). Both formats require uppercase in production, so these literals cannot be real
+  # values of either kind. Listed by value, not by shape, for the same reason as the line above.
+  '''0123456789ab''',
+  '''01arz3ndektsv4rrffq69g5fav''',
   # Entity ID: `pay_`, `op_`, `mer_`, `cor_`, … — prefix, underscore, Crockford base32, first char 0-7.
   '''[a-z][a-z0-9]{1,15}_[0-7][0-9A-HJKMNP-TV-Z]{25}''',
   # Envelope UUID (the canonical example id used throughout the contracts).
