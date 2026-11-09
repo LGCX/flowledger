@@ -21,7 +21,7 @@ None.
 | Interface | Path | Shape |
 | --- | --- | --- |
 | Workspace/package resolution | `package.json` `exports` with condition `@flowledger/source` → `src/index.ts`, `default` → `dist/index.js` | every `@flowledger/*` package/app |
-| Base config + lifecycle | `packages/config/src/base.ts`, `packages/config/src/lifecycle.ts` | `parseBaseConfig(env): BaseConfig`; `runMain(start: StartFn): void`; `type StartFn = (env: Env) => Promise<RunningApp>`; `interface RunningApp { stop(): Promise<void> }`; `startHealthServer(port: number, isReady: () => boolean): Promise<HealthServer>` |
+| Base config + lifecycle | `packages/config/src/base.ts`, `packages/config/src/lifecycle.ts` | `parseBaseConfig(env): BaseConfig`; `runMain(start: StartFn): void`; `type StartFn = (env: Env) => Promise<RunningApp>`; `interface RunningApp { stop(): Promise<void> }`; `startHealthServer(port: number): Promise<HealthServer>`; `interface HealthServer { readonly port: number; setReady(ready: boolean): void; close(): Promise<void> }` |
 | App start functions | `apps/<app>/src/main.ts` | `export const start: StartFn` (each app) |
 | Message validation | `packages/contracts/src/validate.ts` | `validateMessage(input: unknown): MessageValidationResult`; `validateMerchantWebhookPayload(input: unknown): PayloadValidationResult` |
 | Envelope builder | `packages/contracts/src/envelope.ts` (P00-T11) | `buildEnvelope(input: EnvelopeInput): RegisteredEnvelope` — runs `validateMessage` (schema + semantic) and throws `EnvelopeValidationError { issues }` on failure; CONVENTIONS §9 |
