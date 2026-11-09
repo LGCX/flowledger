@@ -14,6 +14,9 @@ importers:
       '@flowledger/app-api':
         specifier: workspace:*
         version: link:apps/api
+      '@flowledger/app-cli':
+        specifier: workspace:*
+        version: link:apps/cli
       '@flowledger/app-merchant-webhook-dispatcher':
         specifier: workspace:*
         version: link:apps/merchant-webhook-dispatcher
@@ -26,6 +29,9 @@ importers:
       '@flowledger/app-payment-worker':
         specifier: workspace:*
         version: link:apps/payment-worker
+      '@flowledger/app-provider-simulator':
+        specifier: workspace:*
+        version: link:apps/provider-simulator
       '@flowledger/app-provider-webhook-receiver':
         specifier: workspace:*
         version: link:apps/provider-webhook-receiver
@@ -105,6 +111,12 @@ importers:
         specifier: 7.8.2
         version: 7.8.2
 
+  apps/cli:
+    dependencies:
+      '@flowledger/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+
   apps/merchant-webhook-dispatcher:
     dependencies:
       '@flowledger/config':
@@ -176,6 +188,15 @@ importers:
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
+
+  apps/provider-simulator:
+    dependencies:
+      '@flowledger/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      fastify:
+        specifier: 5.12.8
+        version: 5.12.8
 
   apps/provider-webhook-receiver:
     dependencies:

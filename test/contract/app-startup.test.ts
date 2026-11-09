@@ -16,6 +16,7 @@ const APPS = [
   'settlement-worker',
   'merchant-webhook-projector',
   'merchant-webhook-dispatcher',
+  'provider-simulator',
 ] as const;
 
 type AppName = (typeof APPS)[number];
@@ -45,6 +46,7 @@ const LOADERS: Record<AppName, () => Promise<AppMain>> = {
     import('@flowledger/app-merchant-webhook-projector/main') as Promise<AppMain>,
   'merchant-webhook-dispatcher': () =>
     import('@flowledger/app-merchant-webhook-dispatcher/main') as Promise<AppMain>,
+  'provider-simulator': () => import('@flowledger/app-provider-simulator/main') as Promise<AppMain>,
 };
 
 /** The only configuration source for these tests: the checked-in example file. */
@@ -62,6 +64,7 @@ function envFromExample(): StartupEnv {
   env['NODE_ENV'] = 'test';
   env['API_PORT'] = '0';
   env['HEALTH_PORT'] = '0';
+  env['SIMULATOR_PORT'] = '0';
   return env;
 }
 
@@ -145,5 +148,35 @@ describe('application startup', () => {
       readFileSync(join(repoRoot, 'apps', app, 'src/main.ts'), 'utf8').includes('process.env'),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it('provider-simulator serves /healthz 200', async () => {
+    const { start } = await LOADERS['provider-simulator']();
+    const port = await freePort();
+    const env = { ...envFromExample(), SIMULATOR_PORT: String(port) };
+
+    const running = await start(env);
+    try {
+      const health = await fetch(`http://127.0.0.1:${port}/healthz`);
+      expect(health.status).toBe(200);
+      expect(await health.json()).toEqual({ status: 'ok' });
+    } finally {
+      await running.stop();
+    }
+  });
+
+  it('flowledger --help prints the three subcommands and exits 0', async () => {
+    const { runCli } = (await import('@flowledger/app-cli/main')) as {
+      runCli: (
+        argv: readonly string[],
+        io: { out(l: string): void; err(l: string): void },
+      ) => Promise<number>;
+    };
+    const out: string[] = [];
+    const exitCode = await runCli(['--help'], { out: (l) => out.push(l), err: () => {} });
+
+    expect(exitCode).toBe(0);
+    const text = out.join('\n');
+    for (const command of ['migrate', 'seed', 'verify']) expect(text).toContain(command);
   });
 });

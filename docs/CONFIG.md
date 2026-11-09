@@ -17,21 +17,21 @@ fails when the two lists disagree.
 
 ## Variables
 
-| Variable                          | Read by                                                       | Required        | Default                         | Allowed values                               | Secret? | Introduced in |
-| --------------------------------- | ------------------------------------------------------------- | --------------- | ------------------------------- | -------------------------------------------- | ------- | ------------- |
-| `NODE_ENV`                        | `packages/config/src/base.ts` (`parseBaseConfig`) — every app | Yes             | —                               | `development`, `test`, `production`          | No      | P00-T03       |
-| `SHUTDOWN_GRACE_MS`               | `packages/config/src/base.ts` → `runMain` — every app         | No              | `10000`                         | integer `1000`–`60000`                       | No      | P00-T03       |
-| `API_PORT`                        | `apps/api` (`readPort`)                                       | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T04       |
-| `HEALTH_PORT`                     | the eight worker apps (`readPort`)                            | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T04       |
-| `SIMULATOR_PORT`                  | `apps/provider-simulator` (`readPort`)                        | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T05       |
-| `SIMULATOR_TEST_ENDPOINTS`        | `apps/provider-simulator` (`readFlag`)                        | No              | `0`                             | `0`, `1`                                     | No      | P00-T05       |
-| `POSTGRES_PASSWORD`               | `infra/docker/compose.yaml` (`postgres` service)              | No              | `flowledger_local_only`         | non-empty string                             | Yes     | P00-T06       |
-| `FL_SIMULATOR_PASSWORD`           | `infra/docker/postgres-init/10-simulator-db.sh` (via compose) | No              | `fl_simulator_local_only`       | non-empty string                             | Yes     | P00-T06       |
-| `FL_SIMULATOR_TRUTH_PASSWORD`     | `infra/docker/postgres-init/10-simulator-db.sh` (via compose) | No              | `fl_simulator_truth_local_only` | non-empty string                             | Yes     | P00-T06       |
-| `PROVIDER_SIMULATOR_DATABASE_URL` | `apps/provider-simulator` only                                | Yes (simulator) | —                               | `postgres://` URL, role `fl_simulator`       | Yes     | P06           |
-| `SIMULATOR_DATABASE_URL`          | harness only: `packages/testkit`, `flowledger verify`         | No              | unset                           | `postgres://` URL, role `fl_simulator_truth` | Yes     | P03           |
-| `PUBSUB_EMULATOR_HOST`            | `packages/messaging` transport                                | No              | unset                           | `host:port`                                  | No      | P05           |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`     | `packages/observability`                                      | No              | unset                           | `http://host:port`                           | No      | P11           |
+| Variable                          | Read by                                                                      | Required        | Default                         | Allowed values                               | Secret? | Introduced in |
+| --------------------------------- | ---------------------------------------------------------------------------- | --------------- | ------------------------------- | -------------------------------------------- | ------- | ------------- |
+| `NODE_ENV`                        | `packages/config/src/base.ts` (`parseBaseConfig`) — every app                | Yes             | —                               | `development`, `test`, `production`          | No      | P00-T03       |
+| `SHUTDOWN_GRACE_MS`               | `packages/config/src/base.ts` → `runMain` — every app                        | No              | `10000`                         | integer `1000`–`60000`                       | No      | P00-T03       |
+| `API_PORT`                        | `apps/api` (`readPort`)                                                      | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T04       |
+| `HEALTH_PORT`                     | the eight worker apps (`readPort`)                                           | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T04       |
+| `SIMULATOR_PORT`                  | `apps/provider-simulator/src/config.ts` (`parseSimulatorConfig`)             | Yes             | —                               | integer `0`–`65535`                          | No      | P00-T05       |
+| `SIMULATOR_TEST_ENDPOINTS`        | `apps/provider-simulator/src/config.ts`; rejected when `NODE_ENV=production` | No              | `0`                             | `0`, `1`                                     | No      | P00-T05       |
+| `POSTGRES_PASSWORD`               | `infra/docker/compose.yaml` (`postgres` service)                             | No              | `flowledger_local_only`         | non-empty string                             | Yes     | P00-T06       |
+| `FL_SIMULATOR_PASSWORD`           | `infra/docker/postgres-init/10-simulator-db.sh` (via compose)                | No              | `fl_simulator_local_only`       | non-empty string                             | Yes     | P00-T06       |
+| `FL_SIMULATOR_TRUTH_PASSWORD`     | `infra/docker/postgres-init/10-simulator-db.sh` (via compose)                | No              | `fl_simulator_truth_local_only` | non-empty string                             | Yes     | P00-T06       |
+| `PROVIDER_SIMULATOR_DATABASE_URL` | `apps/provider-simulator` only                                               | Yes (simulator) | —                               | `postgres://` URL, role `fl_simulator`       | Yes     | P06           |
+| `SIMULATOR_DATABASE_URL`          | harness only: `packages/testkit`, `flowledger verify`                        | No              | unset                           | `postgres://` URL, role `fl_simulator_truth` | Yes     | P03           |
+| `PUBSUB_EMULATOR_HOST`            | `packages/messaging` transport                                               | No              | unset                           | `host:port`                                  | No      | P05           |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`     | `packages/observability`                                                     | No              | unset                           | `http://host:port`                           | No      | P11           |
 
 ## Variables with restricted readers
 

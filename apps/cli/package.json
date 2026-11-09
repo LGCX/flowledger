@@ -1,0 +1,20 @@
+{
+  "name": "@flowledger/app-cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "flowledger": "./dist/index.js"
+  },
+  "exports": {
+    "./main": {
+      "@flowledger/source": "./src/main.ts",
+      "default": "./dist/main.js"
+    }
+  },
+  "scripts": {
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@flowledger/config": "workspace:*"
+  }
+}

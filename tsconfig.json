@@ -54,6 +54,12 @@
     },
     {
       "path": "apps/merchant-webhook-dispatcher"
+    },
+    {
+      "path": "apps/cli"
+    },
+    {
+      "path": "apps/provider-simulator"
     }
   ]
 }

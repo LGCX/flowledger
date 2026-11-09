@@ -20,10 +20,12 @@
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@flowledger/app-api": "workspace:*",
+    "@flowledger/app-cli": "workspace:*",
     "@flowledger/app-merchant-webhook-dispatcher": "workspace:*",
     "@flowledger/app-merchant-webhook-projector": "workspace:*",
     "@flowledger/app-outbox-relay": "workspace:*",
     "@flowledger/app-payment-worker": "workspace:*",
+    "@flowledger/app-provider-simulator": "workspace:*",
     "@flowledger/app-provider-webhook-receiver": "workspace:*",
     "@flowledger/app-provider-webhook-worker": "workspace:*",
     "@flowledger/app-reconciler": "workspace:*",
