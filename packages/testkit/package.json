@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@testcontainers/postgresql": "12.2.1",
+    "fast-check": "4.10.2",
     "pg": "8.23.1",
     "testcontainers": "12.2.1"
   },

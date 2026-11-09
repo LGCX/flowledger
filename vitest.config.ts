@@ -18,6 +18,9 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
+          // Registers fast-check's global seed/run-count and the counterexample reporter
+          // (packages/testkit/src/fast-check-setup.ts).
+          setupFiles: ['packages/testkit/src/fast-check-setup.ts'],
         },
       },
       { ...shared, test: { name: 'contracts', include: ['test/contract/**/*.test.ts'] } },

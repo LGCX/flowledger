@@ -32,6 +32,8 @@ fails when the two lists disagree.
 | `SIMULATOR_DATABASE_URL`          | harness only: `packages/testkit`, `flowledger verify`                        | No              | unset                           | `postgres://` URL, role `fl_simulator_truth` | Yes     | P03           |
 | `PUBSUB_EMULATOR_HOST`            | `packages/messaging` transport                                               | No              | unset                           | `host:port`                                  | No      | P05           |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`     | `packages/observability`                                                     | No              | unset                           | `http://host:port`                           | No      | P11           |
+| `FC_SEED`                         | `packages/testkit/src/fast-check-setup.ts` — unit tests only                 | No              | `20261108`                      | integer                                      | No      | P01-T01       |
+| `FC_NUM_RUNS`                     | `packages/testkit/src/fast-check-setup.ts` — unit tests only                 | No              | `200`                           | integer `1`–`100000`                         | No      | P01-T01       |
 
 ## Variables with restricted readers
 

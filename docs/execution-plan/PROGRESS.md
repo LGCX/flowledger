@@ -865,7 +865,52 @@ Green run 42577539550 (13c31dc):  fast success, integration success
 Red run   42577747019 (df4a5fa):  fast FAILED at `lint`, integration SKIPPED (branch deleted after)
 ```
 
-**Next task:** `P01-T01`.
+## P01-T01 — Domain errors, checked money, property-test harness
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T02.
+
+```text
+TASK P01-T01 — NEEDS-REVIEW
+Acceptance criteria:
+  - every row of the parser table is a test case -> met (64 cases)
+  - toAmountString(parse(s)) === s property -> met
+  - no `number` in money.ts (ESLint money rule) -> met, and the rule was observed firing
+  - a failing property writes one line with seed, path, counterexample -> met, verified once
+    locally then removed: {"test":"deliberate property failure > ...","seed":20261108,
+    "path":"0:0","counterexample":"[0n]"}
+Tests added: packages/domain/src/money.test.ts (64)
+  break-and-restore (each observed failing, then restored):
+    canonical regex loosened to /^.*$/   -> 17 fail
+    length bound removed                 -> 1 fail (14-char inputs become MALFORMED not OUT_OF_RANGE)
+    max-amount check removed             -> 2 fail
+    positive-variant zero check removed  -> 2 fail
+    currency check removed               -> 8 fail
+    checkedAdd limit removed             -> 1 fail
+    toAmountString padded a zero amount  -> round-trip property fails
+    `number` type added to money.ts      -> ESLint money rule errors
+    baseline after restore               -> 64 passing, lint 0
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `fast-check` names the field `counterexamplePath`, not `path`; the JSON line stores it as
+     `path` so the artifact matches the task's stated shape. The first version wrote
+     `details.path`, which is `undefined`, and JSON.stringify silently dropped the key — caught
+     only by reading the persisted line rather than the console output.
+  2. FC_SEED / FC_NUM_RUNS are rows in the docs/CONFIG.md table, not prose bullets: an existing
+     P00-T03 test compares the table against .env.example, and prose entries are invisible to it.
+  3. `parseMoney` reports any shape deviation (missing key, extra key, non-object) as
+     INVALID_REQUEST/VALUE_MALFORMED rather than delegating a missing currency to
+     parseCurrency. The task fixes only the extra-key case; a missing key is the same class of
+     defect and arrives before any field parser runs.
+  4. Added `unwrap` to errors.ts (a small helper for tests and callers that need a throw).
+Contract/plan issues found: none.
+Next task: P01-T02.
+```
+
+**Note:** the money rule's banned literal selector is `Literal[raw=/^\d*\.\d/]` — only decimal
+literals. Integer literals such as the 13-digit length bound are allowed, which is why the parser
+can express its bound without `number`.
+
+**Next task:** `P01-T02`.
 
 
 
