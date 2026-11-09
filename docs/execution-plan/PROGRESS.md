@@ -1161,7 +1161,49 @@ Next task: P01-T09.
 (`exclusionClass(type) === 'EXCLUSIVE' && isRefund`) with a comment contradicting itself, and the
 aliased snapshot above. Both were removed rather than patched.
 
-**Next task:** `P01-T09`.
+## P01-T09 — Operation execution and resolution transitions
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T10.
+
+```text
+TASK P01-T09 — NEEDS-REVIEW
+Acceptance criteria:
+  - every cell of the resolution table is a test -> met, 4 types x 3 outcomes x 3 prior statuses = 36
+  - every transition asserts the exact version deltas -> met
+  - refunded + reserved never increases across a resolution -> met
+  - checkPaymentInvariants is [] after every successful transition -> met, 7 scenarios + expiry
+Tests added: packages/domain/src/transitions.test.ts (67)
+  break-and-restore: 9 distinct breaks attempted. Six bit:
+    refund reservation not released      -> all REFUND cells fail
+    cancel does not void the authorization -> all CANCEL SUCCEEDED cells fail
+    capture success effect removed       -> all CAPTURE SUCCEEDED cells fail
+    refund fee ignores prior refunds     -> the golden thirds linkage fails
+    expiry ignores unresolved refunds    -> the isolated refund-expiry case fails
+    expiry ignores the active operation  -> that expiry case fails
+    corroboration reported as contradiction -> the duplicate-success case fails
+  Three did not bite, and each exposed a real gap in the tests rather than in the code:
+    resolve from REQUESTED               -> no such case existed; added, then it bit once BOTH
+                                            guards were removed (REQUESTED and isResolvable both
+                                            reject, so one alone is redundant)
+    expiry guard fixtures                -> every expiry rejection shares one code/reason, so
+                                            removing a guard was masked by another guard; the
+                                            cases now assert `detail.constraint`
+    (three anchors were also reflowed by prettier and never applied; re-run against real text)
+  baseline after restore -> 67 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `resolveOperation` rejects REQUESTED twice — an explicit check and `isResolvable`. Redundant
+     by construction, kept because the explicit check states the reason (no provider call can have
+     happened) and the predicate guards the general path.
+Contract/plan issues found: none.
+Next task: P01-T10.
+```
+
+**The lesson here is about break quality, not code.** Three of nine breaks initially "passed", and each
+one meant a test was missing or too coarse — not that the code was fine. A break that does not bite is
+a bug report about the test suite.
+
+**Next task:** `P01-T10`.
 
 
 
