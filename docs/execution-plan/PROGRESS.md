@@ -340,5 +340,50 @@ their own terminal: Node 24 ships no `pnpm` shim, so `pnpm` still resolves to th
 `v23.1.0` shim (it works — Corepack reads the `packageManager` pin and runs 10.34.9),
 and the Corepack cache lives in `/tmp`, so pnpm re-downloads after a reboot.
 
-**Next task:** `P00-T05`.
+## P00-T05 — Inert `cli` (`flowledger` bin) and `provider-simulator` entry points
+
+**Status:** `NEEDS-REVIEW` — all gates green, awaiting owner approval before P00-T06.
+
+```text
+TASK P00-T05 — NEEDS-REVIEW
+Commit: 9dc9d9f on task/p00-t05-cli-simulator
+Acceptance criteria:
+  - flowledger --help prints migrate/seed/verify and exits 0 -> met (verified directly
+    and via `pnpm --filter @flowledger/app-cli exec flowledger --help`)
+  - each "not implemented" message names its phase exactly -> met
+    (migrate/seed -> P02, verify -> P03, exit 2; unknown command -> 64)
+  - simulator config rejects test endpoints in production -> met
+  - pnpm check green -> met
+Tests added: apps/cli/src/main.test.ts :: 6 cases
+             apps/provider-simulator/src/config.test.ts :: 7 cases
+             test/contract/app-startup.test.ts :: +3 cases (17 total)
+  break-and-restore (each observed failing, then restored):
+    migrate returns 0 instead of 2           -> fails
+    unknown command returns 0 instead of 64  -> fails
+    usage omits a subcommand                 -> both usage cases fail
+    production guard removed                 -> production case fails
+    flowledger --help exits 1                -> CLI startup case fails
+    simulator rejects ephemeral port         -> simulator startup case fails
+    simulator never binds                    -> added health case fails
+    baseline after restore                   -> 13 unit + 17 contract passing
+Commands: pnpm check -> 0 | pnpm build -> 0 | pnpm check -> 0 (re-run after build)
+          pnpm test:integration -> 0 | pnpm test:e2e -> 0
+          clean clone: install --frozen-lockfile 0, check 0, build 0
+Deviations from the task text:
+  1. `apps/cli/package.json` gains an `./main` export (the spec lists only `bin`),
+     because the contract test imports `runCli`. Same shape as the other apps.
+  2. One strengthening: `provider-simulator serves /healthz 200`. The listed case only
+     asserts start/stop, so a simulator that never binds passed — demonstrated by one of
+     the breaks above.
+Contract/plan issues found: the `flowledger` bin only appears after a build. pnpm links
+a dependency's bin to `apps/cli/dist/index.js`, so on a fresh clone
+`pnpm install && pnpm build` leaves `pnpm --filter @flowledger/app-cli exec flowledger`
+failing with 254 until `pnpm install` runs again. Confirmed in a clean clone; a second
+install links it and the command exits 0. P00-T14 owns CI and the developer guide and
+should sequence build-then-install (or invoke `node apps/cli/dist/index.js`).
+Next task: P00-T06 (dependencies satisfied: yes — P00-T04).
+```
+
+**Next task:** `P00-T06`, after owner approval.
+
 
