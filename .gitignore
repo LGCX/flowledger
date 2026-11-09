@@ -10,3 +10,8 @@ reports/
 infra/docker/.env
 *.log
 .DS_Store
+
+# Agent session state, local to whoever is working in this clone.
+.reasonix/
+reasonix.toml
+
