@@ -649,7 +649,7 @@ None.
 **Implementation instructions**
 1. `fixtures/messages.ts` exports `validMessages: Readonly<Record<MessageType, Record<string, unknown>>>`. Shared constants (all valid Crockford ULIDs):
    `MER='mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ'`, `PAY='pay_01ARZ3NDEKTSV4RRFFQ69G5FAV'`, `OP='op_01ARZ3NDEKTSV4RRFFQ69G5FAX'`, `PACC='pacc_01ARZ3NDEKTSV4RRFFQ69G5FAY'`, `PAT='pat_01ARZ3NDEKTSV4RRFFQ69G5FAW'`, `LTX='ltx_01ARZ3NDEKTSV4RRFFQ69G5FA0'`, `CASE='case_01ARZ3NDEKTSV4RRFFQ69G5FA2'`, `WHD='whd_01ARZ3NDEKTSV4RRFFQ69G5FAS'`, `WHE='whe_01ARZ3NDEKTSV4RRFFQ69G5FA3'`, `SRN='srn_01ARZ3NDEKTSV4RRFFQ69G5FA4'`, `SBT='sbt_01ARZ3NDEKTSV4RRFFQ69G5FB5'`; envelope ids are fixed UUID v4 strings; `correlationId='cor_01ARZ3NDEKTSV4RRFFQ69G5FAW'`; timestamps `2026-11-05T18:44:31.123Z`.
-   Every fixture must satisfy both its schema **and** every semantic rule of P00-T11 (aggregateId/orderingKey equal `data.paymentId` for payment messages; execute `aggregateVersion === data.expectedPaymentVersion`; `resolutionSource === evidence.source`; terminal rejection/failure `resultCode === normalizedError.code`; totals invariants; ledger debits == credits; settlement `aggregateVersion: 1`, `orderingKey: MER`, `postingKey: 'settlement:' + SBT`). `payment.capture.succeeded.v1` is exactly the docs/04 capture example. `merchant.webhook.deliver.v1` uses `orderingKey: WHE` because the schema requires it (R-01). Terminal FAILED fixtures use `noEffectProof: { kind: 'AUTHENTICATED_PROVIDER_REJECTION', providerCode: 'card_not_charged' }`; one FAILED fixture per proof kind is covered by a parameterized positive case.
+   Every fixture must satisfy both its schema **and** every semantic rule of P00-T11 (aggregateId/orderingKey equal `data.paymentId` for payment messages; execute `aggregateVersion === data.expectedPaymentVersion`; `resolutionSource === evidence.source`; terminal rejection/failure `resultCode === normalizedError.code`; totals invariants; ledger debits == credits; settlement `aggregateVersion: 1`, `orderingKey: MER`, `postingKey: 'settlement:' + SBT`). `payment.capture.succeeded.v1` is exactly the docs/04 capture example. `merchant.webhook.deliver.v1` uses `orderingKey: WHE` because the contract requires it: the envelope makes `orderingKey` mandatory, the command schema pins it to a `whe_` ID, and `schemas/README.md` requires `orderingKey === data.endpointId`. Terminal FAILED fixtures use `noEffectProof: { kind: 'AUTHENTICATED_PROVIDER_REJECTION', providerCode: 'card_not_charged' }`; one FAILED fixture per proof kind is covered by a parameterized positive case.
 2. `fixtures/mutations.ts` exports `negativeCases: readonly { name: string; appliesTo: readonly MessageType[] | 'all'; mutate(m): unknown; expect: { keyword: string; instancePathPrefix?: string } }[]` covering (each `appliesTo` explicit):
    | Name | Mutation | Expected Ajv keyword |
    | --- | --- | --- |
@@ -722,6 +722,7 @@ None.
      | 'PAYMENT_ORDERING_KEY_EQUALS_PAYMENT_ID'
      | 'EXECUTE_AGGREGATE_VERSION_EQUALS_EXPECTED_PAYMENT_VERSION'
      | 'WEBHOOK_DELIVERY_AGGREGATE_ID_EQUALS_DELIVERY_ID'
+     | 'WEBHOOK_DELIVERY_ORDERING_KEY_EQUALS_ENDPOINT_ID'
      | 'LEDGER_AGGREGATE_ID_EQUALS_TRANSACTION_ID'
      | 'LEDGER_REFERENCES_MATCH_OPERATION_TYPE'
      | 'LEDGER_DEBITS_EQUAL_CREDITS'
@@ -745,7 +746,8 @@ None.
    | `PAYMENT_AGGREGATE_ID_EQUALS_PAYMENT_ID` | `aggregateType === 'payment'` (execute, reconcile, created, 4 requested, 12 terminal, expired, reconciliation.required, review.required, discrepancy) | `aggregateId === data.paymentId` |
    | `PAYMENT_ORDERING_KEY_EQUALS_PAYMENT_ID` | same | `orderingKey === data.paymentId` |
    | `EXECUTE_AGGREGATE_VERSION_EQUALS_EXPECTED_PAYMENT_VERSION` | `payment.operation.execute.v1` | `aggregateVersion === data.expectedPaymentVersion` |
-   | `WEBHOOK_DELIVERY_AGGREGATE_ID_EQUALS_DELIVERY_ID` | `merchant.webhook.deliver.v1` | `aggregateId === data.deliveryId`. The README/docs/04 "no orderingKey" rule is **not** checked — see R-01 |
+   | `WEBHOOK_DELIVERY_AGGREGATE_ID_EQUALS_DELIVERY_ID` | `merchant.webhook.deliver.v1` | `aggregateId === data.deliveryId` |
+   | `WEBHOOK_DELIVERY_ORDERING_KEY_EQUALS_ENDPOINT_ID` | `merchant.webhook.deliver.v1` | `orderingKey === data.endpointId`. Ordering is per endpoint, so deliveries to one endpoint are ordered and different endpoints of a merchant are independent (D-06). |
    | `LEDGER_AGGREGATE_ID_EQUALS_TRANSACTION_ID` | `ledger.transaction.posted.v1` | `aggregateId === data.ledgerTransactionId` |
    | `LEDGER_REFERENCES_MATCH_OPERATION_TYPE` | ledger | `SETTLEMENT` ⇒ `settlementBatchId` non-null and `paymentId`, `paymentOperationId` null/absent; `CAPTURE`/`REFUND` ⇒ inverse |
    | `LEDGER_DEBITS_EQUAL_CREDITS` | ledger | `BigInt(totalDebitsMinor) === BigInt(totalCreditsMinor)` |
@@ -781,7 +783,7 @@ None.
 - `test/contract/envelope.test.ts`: `positive fixtures build`, `schema-invalid input throws SCHEMA`, `semantic mismatch throws SEMANTIC`, `result is frozen`, `no id generated when absent (throws)`.
 - Command: `pnpm vitest run --project contracts test/contract/semantic.test.ts test/contract/envelope.test.ts test/contract/message-fixtures.test.ts`.
 
-**Non-goals** — No DB lookups; no DLQ routing (P05); no change to the deliver-command orderingKey contract (R-01).
+**Non-goals** — No DB lookups; no DLQ routing (P05); no change to the deliver-command ordering key, which is the endpoint ID per D-06.
 
 **Handoff checklist**
 - [ ] Each rule test observed failing when its check is removed.
@@ -1021,7 +1023,7 @@ Shared-conflict files: `package.json`, `pnpm-lock.yaml`, `docs/VERSIONS.md`, `ts
 | schemas/README Local validation 7 (semantic validator vs mismatched-identity fixtures) | T11 | `semantic.test.ts :: <RULE> mismatch detected` |
 | schemas/README semantic: payment aggregateId/orderingKey == paymentId | T11 | `semantic.test.ts :: PAYMENT_AGGREGATE_ID_EQUALS_PAYMENT_ID`, `:: PAYMENT_ORDERING_KEY_EQUALS_PAYMENT_ID` |
 | schemas/README semantic: execute aggregateVersion == expectedPaymentVersion | T11 | `:: EXECUTE_AGGREGATE_VERSION_EQUALS_EXPECTED_PAYMENT_VERSION` |
-| schemas/README semantic: deliver aggregateId == deliveryId; no orderingKey | T11 (aggregateId); orderingKey rule blocked by R-01 | `:: WEBHOOK_DELIVERY_AGGREGATE_ID_EQUALS_DELIVERY_ID` |
+| schemas/README semantic: deliver aggregateId == deliveryId; orderingKey == endpointId | T11 | `:: WEBHOOK_DELIVERY_AGGREGATE_ID_EQUALS_DELIVERY_ID`, `:: WEBHOOK_DELIVERY_ORDERING_KEY_EQUALS_ENDPOINT_ID` |
 | schemas/README semantic: ledger aggregateId; references by operationType; debits == credits | T11 | `:: LEDGER_*` |
 | schemas/README semantic: settlement aggregate/ordering/version/postingKey | T11 | `:: SETTLEMENT_*` |
 | schemas/README semantic: resolutionSource == evidence.source | T11 | `:: RESOLUTION_SOURCE_EQUALS_EVIDENCE_SOURCE` |
@@ -1053,7 +1055,7 @@ Shared-conflict files: `package.json`, `pnpm-lock.yaml`, `docs/VERSIONS.md`, `ts
 
 | ID | Risk / conflict | Impact | Severity | Recommended resolution | Blocked tasks |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | `merchant.webhook.deliver.v1` ordering key contradiction. `schemas/common/message-envelope.v1.schema.json:18,55` makes `orderingKey` required (minLength 1) and `schemas/commands/merchant-webhook-deliver.v1.schema.json:14` pins it to a `whe_` ID; `docs/04-EVENT_CONTRACTS.md:79,102,106,353,363` and `schemas/README.md:86` say the command carries **no** ordering key; `docs/10-IMPLEMENTATION_PLAN.md:540` says "per-endpoint ordering key". | A schema-valid deliver command must carry an ordering key, so the docs/04:353 contract test ("published without an ordering key") cannot pass. | High | Contract-owner commit before P09: make `orderingKey` optional in the envelope and set `"orderingKey": false` in the deliver schema (unpublished v1, so in-place), update docs/10:540. Binding until decided (README D-06): the deliver command carries `orderingKey` = webhook endpoint ID per its machine schema, the relay passes it unchanged, and the dispatcher subscription is unordered; P00 checks only `aggregateId === data.deliveryId` and fixtures use `orderingKey = endpointId`. | P09 delivery publication (not P00) |
+| R-01 | **Resolved before P00** by D-06 and D-08 fix 6. The machine contracts always required `orderingKey` = the `whe_` endpoint ID; the prose in `docs/01:237`, `docs/04:79,102,106,353,363` and `schemas/README.md:86` claimed no ordering key, and D-06 decided the machine contracts win. Fix 6 corrected the prose toward the schema, so no contract change is needed and the envelope and deliver schema stay as they are. | A schema-valid deliver command must carry an ordering key, which the old prose denied. | Closed | Implement the schema rule in full: `aggregateId === data.deliveryId` **and** `orderingKey === data.endpointId` (both semantic rules in T11), fixtures use `orderingKey = endpointId`. Do not make `orderingKey` optional. | none |
 | R-02 | **Resolved before P00** by D-08 fix 2: `docs/05` §Retrieve a payment timeline now includes the required `truncated` (`openapi/openapi.yaml` `PaymentTimeline.required`). | — | Closed | No action. P00-T09 validates all prose examples with no `knownDeviation` entry and must not add one. | none |
 | R-03 | `openapi/openapi.yaml:1300-1306` says timeline `detail` per-kind shapes "are enumerated in docs/05", but `docs/05:357` only states "closed per-kind object" without listing shapes. | P04 cannot write per-kind validators from the contract. | Medium | Contract owner enumerates per-kind `detail` shapes before P04 timeline work. | P04 (timeline) |
 | R-04 | Ajv `strict: true` fails on the checked-in schemas (strictTypes/strictRequired). | A naive "strict" configuration blocks CI. | Medium | Use the binding option set in P00-T08 (`strictSchema: true`, others off) — satisfies `schemas/README.md:21-31`, which only requires unknown keywords to be errors. Verified during planning. | none |
