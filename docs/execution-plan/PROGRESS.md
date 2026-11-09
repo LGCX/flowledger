@@ -1815,7 +1815,51 @@ construction rather than by hand-arithmetic. Three P02-T09 cases that only need 
 (the partial unique indexes) now run inside a rolled-back transaction, where the deferred check never
 runs — which is what the task text asks for.
 
-**Next task:** `P02-T11`.
+## P02-T11 — Migration 0270: api.idempotency_records and api.claim_idempotency_key
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T12.
+
+```text
+TASK P02-T11 — NEEDS-REVIEW
+Acceptance criteria:
+  - same key + same hash replays the identical stored result -> met (100-way race: 1 OWNER, 99 REPLAY,
+    every replay body deep-equal to the owner's, count(*) = 1, no promise rejected with 23505)
+  - same key + changed hash is CONFLICT deterministically, including when racing -> met
+  - owner rollback lets exactly one waiter become owner -> met (row carries the waiter's hash)
+  - holding past p_lock_timeout_ms raises P0001 IDEMPOTENCY_REQUEST_IN_PROGRESS, inserts nothing -> met
+  - past 90 days (or tombstoned) is EXPIRED with resource identity; 89 days still REPLAY -> met
+  - resource identity is commit-time checked: same-merchant payment, or same-merchant operation of the
+    exact command type -> met (deferred 23514 idempotency_records_resource_integrity)
+  - only the one-way tombstone transition is permitted, only after replay_expires_at -> met
+  - same key text is isolated across merchants and command types -> met
+Tests added: test/integration/db/idempotency.test.ts (23); fixtures fixtureClaim (one connection per
+  call, holding or rolling back on demand) and fixtureInsertIdempotencyRecord
+  break-and-restore (each observed failing, then restored) — all four bit:
+    ON CONFLICT DO NOTHING replaced by a plain INSERT (handoff) -> the 100-claim case fails
+    read-time expiry removed                                   -> 3 cases fail
+    hash comparison replaced by `IF true`                      -> the divergent-race case fails
+    lock-timeout translation removed                           -> the in-progress case fails
+    baseline after restore                                     -> 23 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 285, e2e 0
+Deviations from the task text:
+  1. `api.claim_idempotency_key` is owned by `payments_function_owner`, not an `api` owner. No `api`
+     function-owner role exists in CONVENTIONS §7 and none was invented; the assumption is marked
+     [ASSUMPTION] in the migration. This needs a CONVENTIONS ruling before P04 consumes it.
+  2. The record has no surrogate `id`; the primary key is `(merchant_id, command_type, idempotency_key)`,
+     which is the uniqueness boundary docs/07:1299 names.
+Contract/plan issues found: see deviation 1.
+Next task: P02-T12.
+```
+
+Deferred-by-design: the resource-integrity trigger is `AFTER INSERT ... DEFERRABLE INITIALLY DEFERRED`
+because the claim is a command's first statement — the payment or operation it names is inserted later
+in the same transaction.
+
+Two test-harness lessons recorded rather than papered over: a claim lost to the lock timeout surfaces
+as SQLSTATE `P0001` unless it is mapped (the fixture now maps it), and inserting an operation in a
+fixture must re-sync the payment, or the P02-T10 trigger fires.
+
+**Next task:** `P02-T12`.
 
 
 

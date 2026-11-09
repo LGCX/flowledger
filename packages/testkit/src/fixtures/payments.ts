@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 
 import type pg from 'pg';
 
+import { mapPgError } from '@flowledger/database';
 import { newId } from '@flowledger/domain';
 
 import type { TestMerchant } from './merchant.js';
@@ -286,4 +287,135 @@ export async function fixtureCapturedPayment(
   await fixtureSyncPayment(client, paymentId);
 
   return { paymentId, authorizeId, captureId };
+}
+
+export interface ClaimOutcome {
+  readonly outcome: 'OWNER' | 'REPLAY' | 'CONFLICT' | 'EXPIRED';
+  readonly resource_type: string | null;
+  readonly resource_id: string | null;
+  readonly http_status: number | null;
+  readonly response_body: unknown;
+  readonly response_headers: unknown;
+  readonly correlation_id: string | null;
+}
+
+export interface ClaimOptions {
+  readonly commandType?: 'CREATE_PAYMENT' | 'AUTHORIZE' | 'CAPTURE' | 'CANCEL' | 'REFUND';
+  readonly idempotencyKey: string;
+  readonly requestHash?: Buffer;
+  readonly resourceType?: 'PAYMENT' | 'PAYMENT_OPERATION';
+  readonly resourceId: string;
+  readonly httpStatus?: number;
+  readonly responseBody?: unknown;
+  readonly responseHeaders?: unknown;
+  readonly responseHash?: Buffer;
+  readonly correlationId?: string;
+  readonly lockTimeoutMs?: number;
+  /** Held open after the claim, so a concurrent claim can contend with it. */
+  readonly holdMs?: number;
+  readonly finish?: 'commit' | 'rollback';
+}
+
+/**
+ * Claims an idempotency key as `payments_function_owner` and returns the outcome.
+ *
+ * A separate connection per call, because that is the thing under test: concurrency here is about
+ * distinct transactions, and a pooled client would serialise them.
+ */
+export async function fixtureClaim(
+  pool: pg.Pool,
+  merchant: TestMerchant,
+  options: ClaimOptions,
+): Promise<ClaimOutcome> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL ROLE payments_function_owner');
+    await client.query("SELECT set_config('app.merchant_id', $1, true)", [merchant.merchantId]);
+
+    const commandType = options.commandType ?? 'CREATE_PAYMENT';
+    const resourceType =
+      options.resourceType ?? (commandType === 'CREATE_PAYMENT' ? 'PAYMENT' : 'PAYMENT_OPERATION');
+
+    const { rows } = await client.query<ClaimOutcome>(
+      `SELECT outcome, resource_type, resource_id, http_status, response_body, response_headers,
+              correlation_id
+         FROM api.claim_idempotency_key($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13)`,
+      [
+        merchant.merchantId,
+        commandType,
+        options.idempotencyKey,
+        options.requestHash ?? createHash('sha256').update(options.idempotencyKey, 'utf8').digest(),
+        resourceType,
+        options.resourceId,
+        options.httpStatus ?? (commandType === 'CREATE_PAYMENT' ? 201 : 202),
+        JSON.stringify(options.responseBody ?? { id: options.resourceId }),
+        JSON.stringify(options.responseHeaders ?? { 'content-type': 'application/json' }),
+        options.responseHash ?? createHash('sha256').update(options.resourceId, 'utf8').digest(),
+        options.correlationId ?? 'corr-claim-000000001',
+        merchant.credentialId,
+        options.lockTimeoutMs ?? 2_000,
+      ],
+    );
+
+    if (options.holdMs !== undefined) {
+      await client.query('SELECT pg_sleep($1)', [options.holdMs / 1000]);
+    }
+
+    await client.query((options.finish ?? 'commit') === 'commit' ? 'COMMIT' : 'ROLLBACK');
+    const row = rows[0];
+    if (row === undefined) throw new Error('claim returned no row');
+    return row;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    // Map SQLSTATEs so a caller sees IDEMPOTENCY_REQUEST_IN_PROGRESS rather than P0001.
+    throw mapPgError(error);
+  } finally {
+    client.release();
+  }
+}
+
+/** Inserts a record directly as the owner, for cases that need a specific `committed_at`. */
+export async function fixtureInsertIdempotencyRecord(
+  client: pg.ClientBase,
+  merchant: TestMerchant,
+  options: {
+    commandType?: string;
+    idempotencyKey: string;
+    resourceId: string;
+    resourceType?: string;
+    requestHash?: Buffer;
+    committedAt?: Date;
+    daysOld?: number;
+    httpStatus?: number;
+  },
+): Promise<void> {
+  const commandType = options.commandType ?? 'CREATE_PAYMENT';
+  const resourceType = options.resourceType ?? 'PAYMENT';
+  const committedAt =
+    options.committedAt ?? new Date(Date.now() - (options.daysOld ?? 0) * 24 * 60 * 60 * 1000);
+
+  await client.query(
+    `INSERT INTO api.idempotency_records
+       (merchant_id, command_type, idempotency_key, request_hash, resource_type, resource_id,
+        http_status, response_body, response_headers, response_hash, correlation_id, credential_id,
+        committed_at, replay_expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13::timestamptz,
+             $13::timestamptz + interval '90 days')`,
+    [
+      merchant.merchantId,
+      commandType,
+      options.idempotencyKey,
+      options.requestHash ?? createHash('sha256').update(options.idempotencyKey, 'utf8').digest(),
+      resourceType,
+      options.resourceId,
+      options.httpStatus ?? (commandType === 'CREATE_PAYMENT' ? 201 : 202),
+      JSON.stringify({ id: options.resourceId }),
+      JSON.stringify({ 'content-type': 'application/json' }),
+      createHash('sha256').update(options.resourceId, 'utf8').digest(),
+      'corr-fixture-00000001',
+      merchant.credentialId,
+      committedAt,
+    ],
+  );
 }
