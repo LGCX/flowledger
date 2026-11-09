@@ -1901,7 +1901,53 @@ My own fixture passed `pool.connect()` (a Promise) where a client was expected a
 the test file's 46 cases passed while the fixture teardown hung for the full 120 s timeout. It is worth
 treating a passing suite with a timing-out `afterAll` as a failure, not a pass.
 
-**Next task:** `P02-T13`.
+## P02-T13 — Migration 0290: protected outbox insertion `messaging.insert_outbox`
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T14.
+
+```text
+TASK P02-T13 — NEEDS-REVIEW
+Acceptance criteria:
+  - each reason in the check table has a test asserting detail.reason (not merely "an error") -> met
+    (NOT_OBJECT, UNKNOWN_FIELD, MISSING_FIELD, INVALID_FIELD_FORMAT x5, UNREGISTERED_TYPE,
+     KIND_MISMATCH, SCHEMA_VERSION_MISMATCH, AGGREGATE_TYPE_MISMATCH, AGGREGATE_ID_MISMATCH,
+     ORDERING_KEY_MISMATCH, AGGREGATE_VERSION_MISMATCH, SUBJECT_NOT_FOUND, POSTING_KEY_MISMATCH)
+  - every registered type with a positive fixture is accepted and every relational column equals its
+    envelope field -> met for all five aggregate families
+  - a rejected call inside a transaction that already inserted other rows leaves none committed -> met
+    (isolated merchant, count 0 after rollback)
+  - no runtime role can execute insert_outbox or insert into the outbox directly -> met (12 roles x 2);
+    function is prosecdef with search_path pinned and no PUBLIC EXECUTE
+  - unknown envelope fields and unregistered type/version pairs never reach the table -> met
+Tests added: test/integration/db/insert-outbox.test.ts (33);
+  packages/testkit/src/envelopes.ts (five builders, all schema-valid via buildEnvelope)
+  break-and-restore (each observed failing, then restored) — all four bit:
+    registry existence check removed        -> the unregistered-type case fails
+    payment ordering-key check removed      -> the ordering-key case and the atomicity case fail
+    subject existence check removed         -> the nonexistent and foreign-merchant cases fail
+    settlement posting-key check removed    -> the posting-key case fails
+    baseline after restore                  -> 33 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 364, e2e 0
+Deviations from the task text:
+  1. A `message_types` read policy for `messaging_function_owner` is added here. P02-T12 enabled RLS on
+     that table with no policy (the task listed RLS for outbox/inbox/DLQ/replays only), so the SECURITY
+     DEFINER function saw an empty registry and rejected every envelope as UNREGISTERED_TYPE.
+     Migrations are frozen once committed, so the policy is added in 0290 and the defect is disclosed.
+Contract/plan issues found: none beyond deviation 1.
+Next task: P02-T14.
+```
+
+Three real defects were found by running the code rather than reading it:
+
+1. **RLS without a policy on `message_types`** (written in P02-T12): the definer function owned by
+   `messaging_function_owner` sees zero registry rows, so every envelope was UNREGISTERED_TYPE.
+2. **`'settlement:' || p_envelope->>'aggregateId'`** resolved to `jsonb || anynonarray` because the left
+   operand is an unknown literal, so PostgreSQL tried to parse `settlement:` as JSON. Explicit `::text`
+   casts fix it.
+3. The envelope builders must supply `id` themselves — `buildEnvelope` deliberately never invents one —
+   and `requestedAmount` is a money object, not a string.
+
+**Next task:** `P02-T14`.
 
 
 

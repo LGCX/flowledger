@@ -1,4 +1,5 @@
 export * from './constraints.js';
+export * from './envelopes.js';
 export * from './fast-check-setup.js';
 export * from './pg.js';
 export * from './postgres.js';
