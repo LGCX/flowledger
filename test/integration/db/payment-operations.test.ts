@@ -142,6 +142,12 @@ describe('constraint coverage', () => {
       'payment_operations_one_successful_authorization',
       'payment_operations_one_successful_capture',
       'payment_operations_one_successful_cancel',
+      // Added by 0293: the snapshot is the named policy row, that row is the payment's binding, and
+      // the fee arithmetic is exact.
+      'payment_operations_fee_snapshot_fkey',
+      'payment_operations_payment_fee_binding_fkey',
+      'payment_operations_capture_fee_formula',
+      'payment_operations_refund_fee_bound',
     ]);
   });
 });
@@ -193,25 +199,163 @@ describe('fee-effect rules', () => {
     }
   });
 
-  it('rejects a CAPTURE fee of amount + 1', async () => {
+  it('rejects a CAPTURE whose exact fee exceeds its amount', async () => {
+    // Below the policy minimum the formula prices 1 at floor((290+5000)/10000)+30 = 30 > 1: the
+    // formula check is satisfied, so only the 0..amount bound can refuse it.
     const { paymentId } = await authorizedPayment();
     const error = await insertOperation(paymentId, {
       type: 'CAPTURE',
-      amountMinor: 1_000n,
-      feeEffectAmountMinor: 1_001n,
+      amountMinor: 1n,
     }).catch((caught: unknown) => caught);
     expect((error as { constraint?: string }).constraint).toBe('payment_operations_fee_effect');
   });
 
   it('accepts a CAPTURE fee exactly equal to the amount', async () => {
+    // A 10000 bp, zero-fixed policy prices every capture at its full amount: the bound's edge.
+    const fullFee = await createTestMerchant(database.ownerPool, {
+      basisPoints: 10_000,
+      fixedAmountMinor: 0n,
+      minimumCaptureAmountMinor: 1n,
+    });
+    await expect(
+      inTransaction(async (client) => {
+        const paymentId = await fixtureInsertPayment(client, fullFee, {
+          requestedAmountMinor: 1_000n,
+        });
+        await fixtureInsertOperation(client, fullFee, paymentId, {
+          type: 'AUTHORIZE',
+          amountMinor: 1_000n,
+          status: 'SUCCEEDED',
+        });
+        await fixtureSyncPayment(client, paymentId);
+        const id = await fixtureInsertOperation(client, fullFee, paymentId, {
+          type: 'CAPTURE',
+          amountMinor: 1_000n,
+          feeEffectAmountMinor: 1_000n,
+        });
+        await fixtureSyncPayment(client, paymentId);
+        return id;
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejects a CAPTURE fee that is not the policy formula', async () => {
+    // 1000 at 290 bp + 30 is floor((290000+5000)/10000)+30 = 59; 60 is within 0..amount but wrong.
+    const { paymentId } = await authorizedPayment();
+    const error = await insertOperation(paymentId, {
+      type: 'CAPTURE',
+      amountMinor: 1_000n,
+      feeEffectAmountMinor: 60n,
+    }).catch((caught: unknown) => caught);
+    expect((error as { constraint?: string }).constraint).toBe(
+      'payment_operations_capture_fee_formula',
+    );
+  });
+
+  it('accepts the formula fee', async () => {
     const { paymentId } = await authorizedPayment();
     await expect(
       insertOperation(paymentId, {
         type: 'CAPTURE',
         amountMinor: 1_000n,
-        feeEffectAmountMinor: 1_000n,
+        feeEffectAmountMinor: 59n,
       }),
     ).resolves.toBeTruthy();
+  });
+
+  it('rejects a fee snapshot that disagrees with the policy row it names', async () => {
+    const { paymentId } = await authorizedPayment();
+    // 100 bp against a policy row that says 290: the snapshot names the row but disagrees with it.
+    const direct = await runMapped(
+      `INSERT INTO payments.payment_operations
+         (id, merchant_id, payment_id, type, amount_minor, provider_account_id,
+          provider_account_version, provider_idempotency_key, fee_policy_id, fee_policy_version,
+          fee_basis_points, fee_fixed_amount_minor, fee_capture_rounding_mode, fee_refund_mode,
+          fee_effect_type, fee_effect_amount_minor)
+       VALUES ($1, $2, $3, 'CAPTURE', 1000, $4, 1, $5, $6, 1, 100, 30, 'HALF_UP', 'PROPORTIONAL',
+               'CHARGE', 40)`,
+      [
+        newId('op'),
+        merchant.merchantId,
+        paymentId,
+        merchant.providerAccountId,
+        `flowledger:test:${newId('op')}`,
+        merchant.feePolicyId,
+      ],
+    );
+    expect('error' in direct && (direct.error as { constraint?: string }).constraint).toBe(
+      'payment_operations_fee_snapshot_fkey',
+    );
+  });
+
+  it('rejects an operation priced with a policy other than its payment’s binding', async () => {
+    // Own merchant: superseding the policy must not leak into the other cases in this file.
+    const repriced = await createTestMerchant(database.ownerPool);
+    const paymentId = await inTransaction(async (client) => {
+      const id = await fixtureInsertPayment(client, repriced, { requestedAmountMinor: 10_000n });
+      await fixtureInsertOperation(client, repriced, id, {
+        type: 'AUTHORIZE',
+        amountMinor: 10_000n,
+        status: 'SUCCEEDED',
+      });
+      await fixtureSyncPayment(client, id);
+      return id;
+    });
+    const other = newId('fee');
+    const direct = await runMapped(
+      `WITH p AS (
+         UPDATE payments.fee_policies SET superseded_at = clock_timestamp()
+          WHERE merchant_id = $2 AND superseded_at IS NULL RETURNING 1
+       )
+       INSERT INTO payments.fee_policies
+         (id, merchant_id, version, basis_points, fixed_amount_minor, minimum_capture_amount_minor)
+       SELECT $1, $2, 2, 290, 30, 50 FROM p`,
+      [other, repriced.merchantId],
+    );
+    expect(direct).toEqual({ ok: true });
+    const error = await runMapped(
+      `INSERT INTO payments.payment_operations
+         (id, merchant_id, payment_id, type, amount_minor, provider_account_id,
+          provider_account_version, provider_idempotency_key, fee_policy_id, fee_policy_version,
+          fee_basis_points, fee_fixed_amount_minor, fee_capture_rounding_mode, fee_refund_mode,
+          fee_effect_type, fee_effect_amount_minor)
+       VALUES ($1, $2, $3, 'CAPTURE', 1000, $4, 1, $5, $6, 2, 290, 30, 'HALF_UP', 'PROPORTIONAL',
+               'CHARGE', 59)`,
+      [
+        newId('op'),
+        repriced.merchantId,
+        paymentId,
+        repriced.providerAccountId,
+        `flowledger:test:${newId('op')}`,
+        other,
+      ],
+    );
+    expect('error' in error && (error.error as { constraint?: string }).constraint).toBe(
+      'payment_operations_payment_fee_binding_fkey',
+    );
+  });
+
+  it('rejects a REFUND reversal larger than the refund amount', async () => {
+    const client = await database.ownerPool.connect();
+    try {
+      await client.query('BEGIN');
+      const { paymentId, captureId } = await fixtureCapturedPayment(client, merchant, 10_000n);
+      await client.query('COMMIT');
+      await client.query('BEGIN');
+      const error = await fixtureInsertOperation(client, merchant, paymentId, {
+        type: 'REFUND',
+        amountMinor: 100n,
+        status: 'SUCCEEDED',
+        captureOperationId: captureId,
+        feeEffectAmountMinor: 101n,
+      }).catch((caught: unknown) => caught);
+      await client.query('ROLLBACK');
+      expect((error as { constraint?: string }).constraint).toBe(
+        'payment_operations_refund_fee_bound',
+      );
+    } finally {
+      client.release();
+    }
   });
 
   it('rejects a REFUND with a fee while REQUESTED, and a SUCCEEDED REFUND without one', async () => {
@@ -374,7 +518,7 @@ describe('link and resolution rules', () => {
               fee_effect_amount_minor)
            VALUES ($1, $2, $3, 'CAPTURE', 100, 'REJECTED', $4, 1, $5, 'CARD_DECLINED',
                    'API_RESPONSE', $6, clock_timestamp(), $7, 1, 290, 30, 'HALF_UP', 'PROPORTIONAL',
-                   'CHARGE', 30)`,
+                   'CHARGE', 33)`,
           [
             newId('op'),
             merchant.merchantId,
@@ -456,7 +600,14 @@ describe('exclusion indexes', () => {
   )(
     'refuses a second unresolved exclusive: %s',
     async (_label, firstType, secondType, firstStatus) => {
-      const { paymentId } = await authorizedPayment();
+      // An AUTHORIZE needs a payment with no successful authorization yet: since 0294 a new attempt
+      // beside a success is itself refused (docs/03 §MVP policy decisions), which is not this case.
+      const paymentId =
+        firstType === 'AUTHORIZE'
+          ? await inTransaction((client) =>
+              fixtureInsertPayment(client, merchant, { requestedAmountMinor: 10_000n }),
+            )
+          : (await authorizedPayment()).paymentId;
       await expect(
         insertOperation(paymentId, {
           type: firstType,

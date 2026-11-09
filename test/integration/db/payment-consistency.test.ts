@@ -344,6 +344,59 @@ describe('confirmed totals', () => {
   });
 });
 
+describe('authorization attempts (0294, docs/03 §MVP policy decisions)', () => {
+  function expectAttemptFailure(result: Awaited<ReturnType<typeof inTransaction>>, why: string) {
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('23514');
+    expect(result.error.constraint).toBe('payment_authorization_attempts');
+    expect(result.error.message).toBe(`payment_authorization_attempts: ${why}`);
+  }
+
+  async function rejectedAttempts(client: pg.ClientBase, m: TestMerchant, count: number) {
+    const paymentId = await fixtureInsertPayment(client, m, { requestedAmountMinor: 1_000n });
+    for (let attempt = 0; attempt < count; attempt += 1) {
+      await fixtureInsertOperation(client, m, paymentId, {
+        type: 'AUTHORIZE',
+        amountMinor: 1_000n,
+        status: 'REJECTED',
+      });
+    }
+    return paymentId;
+  }
+
+  it('commits three rejected attempts', async () => {
+    const m = await merchant();
+    const result = await inTransaction((client) => rejectedAttempts(client, m, 3));
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses a fourth attempt', async () => {
+    const m = await merchant();
+    const result = await inTransaction(async (client) => {
+      const paymentId = await rejectedAttempts(client, m, 3);
+      await fixtureInsertOperation(client, m, paymentId, {
+        type: 'AUTHORIZE',
+        amountMinor: 1_000n,
+        status: 'REJECTED',
+      });
+    });
+    expectAttemptFailure(result, 'more than three');
+  });
+
+  it('refuses a new attempt after one has succeeded', async () => {
+    const m = await merchant();
+    const result = await inTransaction(async (client) => {
+      const { paymentId } = await consistentAuthorized(client, m, 1_000n);
+      await fixtureInsertOperation(client, m, paymentId, {
+        type: 'AUTHORIZE',
+        amountMinor: 1_000n,
+      });
+    });
+    expectAttemptFailure(result, 'attempt alongside a success');
+  });
+});
+
 describe('deferral', () => {
   it('fails at the statement when constraints are set immediate', async () => {
     const m = await merchant();
@@ -361,7 +414,7 @@ describe('deferral', () => {
               fee_basis_points, fee_fixed_amount_minor, fee_capture_rounding_mode, fee_refund_mode,
               fee_effect_type, fee_effect_amount_minor)
            VALUES ($1, $2, $3, 'CAPTURE', 100, $4, 1, $5, $6, 1, 290, 30, 'HALF_UP', 'PROPORTIONAL',
-                   'CHARGE', 30)`,
+                   'CHARGE', 33)`,
           [
             'op_01ARZ3NDEKTSV4RRFFQ69G5FAA',
             m.merchantId,

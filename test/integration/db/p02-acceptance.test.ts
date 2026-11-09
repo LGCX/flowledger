@@ -52,7 +52,8 @@ describe('migration history', () => {
       // sequence is what proves the numbered batches mean what they say.
       expect([...first.applied]).toEqual([...first.applied].sort());
       expect(first.applied[0]).toMatch(/^0200_/);
-      expect(first.applied.at(-1)).toMatch(/^0290_/);
+      // 0291–0294 are the review fixes to M2 (forward-only: 0270, 0280 and 0250 are frozen).
+      expect(first.applied.at(-1)).toMatch(/^0294_/);
 
       const second = await migrate({ connectionString: empty.ownerUrl, ledgerBucketCount: 32 });
       expect(second.applied).toEqual([]);

@@ -111,11 +111,16 @@ export async function fixtureInsertOperation(
     operation.feeEffectType ??
     (operation.type === 'CAPTURE' ? 'CHARGE' : operation.type === 'REFUND' ? 'REFUND' : 'NONE');
 
+  // A capture's fee is the docs/02 formula over the policy the snapshot names (0293 checks it); a
+  // succeeded refund's reversal is never more than the refund amount.
   const defaultFee =
     operation.type === 'CAPTURE'
-      ? 30n
+      ? (operation.amountMinor * BigInt(merchant.feeBasisPoints) + 5000n) / 10000n +
+        merchant.feeFixedAmountMinor
       : operation.type === 'REFUND' && status === 'SUCCEEDED'
-        ? 30n
+        ? operation.amountMinor < 30n
+          ? operation.amountMinor
+          : 30n
         : null;
   const feeEffectAmount =
     operation.feeEffectAmountMinor === undefined ? defaultFee : operation.feeEffectAmountMinor;
@@ -158,8 +163,8 @@ export async function fixtureInsertOperation(
       operation.captureOperationId ?? null,
       usesFeeSnapshot ? merchant.feePolicyId : null,
       usesFeeSnapshot ? merchant.feePolicyVersion : null,
-      usesFeeSnapshot ? 290 : null,
-      usesFeeSnapshot ? 30n.toString() : null,
+      usesFeeSnapshot ? merchant.feeBasisPoints : null,
+      usesFeeSnapshot ? merchant.feeFixedAmountMinor.toString() : null,
       usesFeeSnapshot ? 'HALF_UP' : null,
       usesFeeSnapshot ? 'PROPORTIONAL' : null,
       feeEffectType,
@@ -392,16 +397,20 @@ export async function fixtureInsertIdempotencyRecord(
 ): Promise<void> {
   const commandType = options.commandType ?? 'CREATE_PAYMENT';
   const resourceType = options.resourceType ?? 'PAYMENT';
-  const committedAt =
-    options.committedAt ?? new Date(Date.now() - (options.daysOld ?? 0) * 24 * 60 * 60 * 1000);
+  // Ages are computed by the database clock, never the host's: the claim compares against
+  // `clock_timestamp()`, and mixing the two clocks made the exact-boundary case flaky under skew.
+  const committedAt = options.committedAt ?? null;
+  const hoursOld = (options.daysOld ?? 0) * 24;
 
   await client.query(
     `INSERT INTO api.idempotency_records
        (merchant_id, command_type, idempotency_key, request_hash, resource_type, resource_id,
         http_status, response_body, response_headers, response_hash, correlation_id, credential_id,
         committed_at, replay_expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13::timestamptz,
-             $13::timestamptz + interval '90 days')`,
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, w.committed,
+            w.committed + interval '2160 hours'
+       FROM (SELECT coalesce($13::timestamptz, clock_timestamp() - $14::integer * interval '1 hour')
+                      AS committed) AS w`,
     [
       merchant.merchantId,
       commandType,
@@ -416,6 +425,7 @@ export async function fixtureInsertIdempotencyRecord(
       'corr-fixture-00000001',
       merchant.credentialId,
       committedAt,
+      hoursOld,
     ],
   );
 }

@@ -212,6 +212,7 @@ describe('outbox envelope derivation', () => {
     ['ordering_key', { ordering_key: 'pay_01ARZ3NDEKTSV4RRFFQ69G5FAC' }],
     ['correlation_id', { correlation_id: 'corr-messaging-000002' }],
     ['causation_id', { causation_id: 'req_01ARZ3NDEKTSV4RRFFQ69G5FAB' }],
+    ['occurred_at', { occurred_at: '2026-01-01T00:00:01.000Z' }],
   ])('rejects a %s that disagrees with the envelope', async (column, override) => {
     const error = await insertOutbox(outboxRow(envelopeFor(), override)).catch(
       (caught: unknown) => caught,
@@ -238,6 +239,29 @@ describe('outbox envelope derivation', () => {
     ).catch((caught: unknown) => caught);
     expect((error as { constraint?: string }).constraint).toBe('outbox_messages_message_type_fkey');
   });
+
+  it('rejects an occurredAt without an explicit offset, so the comparison is TimeZone-free', async () => {
+    const envelope = envelopeFor({ occurredAt: '2026-01-01T00:00:00.000' });
+    const error = await insertOutbox(
+      outboxRow(envelope, { occurred_at: '2026-01-01T00:00:00.000Z' }),
+    ).catch((caught: unknown) => caught);
+    expect((error as { constraint?: string }).constraint).toBe(
+      'outbox_messages_envelope_derivation',
+    );
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['kind', { kind: 'COMMAND' }],
+    ['aggregateType', { aggregateType: 'ledger_transaction' }],
+  ])(
+    'rejects a row whose %s agrees with its envelope but not with the registry',
+    async (_field, override) => {
+      // Envelope and columns agree, so only the registry foreign key can refuse it.
+      const envelope = envelopeFor(override);
+      const error = await insertOutbox(outboxRow(envelope)).catch((caught: unknown) => caught);
+      expect((error as { constraint?: string }).constraint).toBe('outbox_messages_registry_fkey');
+    },
+  );
 
   it('rejects an envelope of the wrong JSON type', async () => {
     const error = await insertOutbox(
@@ -641,6 +665,7 @@ describe('constraint coverage', () => {
       'outbox_messages_lease_pair',
       'outbox_messages_archive_state',
       'outbox_messages_envelope_derivation',
+      'outbox_messages_registry_fkey',
     ]);
     await assertConstraintCoverage(database.ownerPool, 'messaging.inbox_messages', [
       'inbox_messages_pkey',
@@ -681,6 +706,7 @@ describe('constraint coverage', () => {
       'message_types_schema_version',
       'message_types_aggregate_type',
       'message_types_schema_path',
+      'message_types_registry_key',
     ]);
   });
 });

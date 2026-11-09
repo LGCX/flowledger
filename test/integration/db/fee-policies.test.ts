@@ -114,6 +114,8 @@ describe('constraint coverage', () => {
       'fee_policies_merchant_id_version_key',
       'fee_policies_merchant_fkey',
       'fee_policies_one_current',
+      // Added by 0293: the composite target an operation's fee snapshot must match.
+      'fee_policies_snapshot_key',
     ]);
   });
 });

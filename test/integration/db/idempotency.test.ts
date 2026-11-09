@@ -147,6 +147,71 @@ describe('constraint negatives', () => {
       client.release();
     }
   });
+
+  /**
+   * `+ interval '90 days'` is calendar arithmetic in the session TimeZone, so across a DST change it
+   * is 89d23h or 90d01h. The window must be the same duration whatever the client's TimeZone is.
+   * 2026-08-11 + 90 days crosses the US DST end on 2026-11-01.
+   */
+  it('measures the window in hours, independent of the session TimeZone', async () => {
+    const paymentId = await paymentFor(merchant);
+    const client = await database.ownerPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL timezone = 'America/Chicago'");
+      const committedAt = new Date('2026-08-11T12:00:00Z');
+
+      // Exactly 2160 hours: accepted under a DST-observing session.
+      await fixtureInsertIdempotencyRecord(client, merchant, {
+        idempotencyKey: key(),
+        resourceId: paymentId,
+        committedAt,
+      });
+
+      // Calendar days under that session are 2161 hours here: refused.
+      await client.query('SAVEPOINT calendar');
+      const error = await client
+        .query(
+          `INSERT INTO api.idempotency_records
+             (merchant_id, command_type, idempotency_key, request_hash, resource_type, resource_id,
+              http_status, response_body, response_headers, response_hash, correlation_id,
+              credential_id, committed_at, replay_expires_at)
+           VALUES ($1, 'CREATE_PAYMENT', $2, $3, 'PAYMENT', $4, 201, '{}'::jsonb, '{}'::jsonb, $3,
+                   'corr-window-00000002', $5, $6::timestamptz, $6::timestamptz + interval '90 days')`,
+          [
+            merchant.merchantId,
+            key(),
+            Buffer.alloc(32, 1),
+            paymentId,
+            merchant.credentialId,
+            committedAt,
+          ],
+        )
+        .catch((caught: unknown) => caught);
+      expect((error as { constraint?: string }).constraint).toBe(
+        'idempotency_records_replay_window',
+      );
+      await client.query('ROLLBACK TO SAVEPOINT calendar');
+
+      // The claim itself writes a row the CHECK accepts under the same session.
+      await client.query('SET LOCAL ROLE payments_function_owner');
+      await client.query("SELECT set_config('app.merchant_id', $1, true)", [merchant.merchantId]);
+      const { rows } = await client.query<{ outcome: string }>(
+        `SELECT outcome FROM api.claim_idempotency_key($1, 'CREATE_PAYMENT', $2, $3, 'PAYMENT', $4,
+           201::smallint, '{}'::jsonb, '{}'::jsonb, $3, 'corr-window-00000003', $5)`,
+        [merchant.merchantId, key(), Buffer.alloc(32, 2), paymentId, merchant.credentialId],
+      );
+      expect(rows[0]?.outcome).toBe('OWNER');
+      const window = await client.query<{ hours: string }>(
+        `SELECT (extract(epoch FROM replay_expires_at - committed_at) / 3600)::bigint::text AS hours
+           FROM api.idempotency_records WHERE correlation_id = 'corr-window-00000003'`,
+      );
+      expect(window.rows[0]?.hours).toBe('2160');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+  });
 });
 
 describe('claim concurrency', () => {

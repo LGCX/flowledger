@@ -41,6 +41,9 @@ export interface TestMerchant {
   readonly providerAccountVersion: 1;
   readonly feePolicyId: string;
   readonly feePolicyVersion: 1;
+  /** The fee policy's inputs, so operation fixtures can snapshot exactly what the policy row says. */
+  readonly feeBasisPoints: number;
+  readonly feeFixedAmountMinor: bigint;
   readonly routeProviderCode: 'fake-provider';
 }
 
@@ -147,6 +150,8 @@ export async function createTestMerchant(
     providerAccountVersion: 1,
     feePolicyId,
     feePolicyVersion: 1,
+    feeBasisPoints: basisPoints,
+    feeFixedAmountMinor: fixedAmountMinor,
     routeProviderCode: 'fake-provider',
   };
 }

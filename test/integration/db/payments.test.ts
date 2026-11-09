@@ -119,6 +119,8 @@ describe('constraint coverage', () => {
       'payments_merchant_reference_key',
       // Added by 0250, once operations exist to point at.
       'payments_active_exclusive_operation_fkey',
+      // Added by 0293: the target binding an operation's fee policy to its payment's.
+      'payments_fee_binding_key',
     ]);
   });
 });

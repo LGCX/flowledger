@@ -2,9 +2,9 @@
  * The committed fixture must migrate forward cleanly.
  *
  * This is the test that decides whether `test/fixtures/db/P02.sql` is worth committing. It restores the
- * dump into an empty database, runs the real migration runner against it, and expects *zero* files to
- * apply — the dump came from a database already at the latest M2 migration, so anything the runner wants
- * to apply means the fixture and the migrations have diverged.
+ * dump into an empty database and runs the real migration runner against it. The dump was taken at 0290;
+ * the runner must apply exactly the files added since (the P02 review fixes, 0291–0294) and nothing
+ * else, which is also the proof that those forward migrations hold against populated M2 data.
  *
  * Two details are load-bearing. The restore runs as `fl_migration_owner`, not as the superuser: with
  * `--no-owner` in the dump, restored objects belong to whoever runs `psql`, and a superuser-owned schema
@@ -26,6 +26,14 @@ import {
   TEST_MIGRATION_OWNER_PASSWORD,
   type TestDatabase,
 } from '@flowledger/testkit';
+
+/** Files added after the dump was generated (the P02 review fixes). */
+const MIGRATIONS_AFTER_DUMP = [
+  '0291_idempotency_replay_window.sql',
+  '0292_outbox_derivation.sql',
+  '0293_fee_snapshot_binding.sql',
+  '0294_authorization_attempt_limit.sql',
+];
 
 const FIXTURE = join(import.meta.dirname, '..', '..', 'fixtures', 'db', 'P02.sql');
 
@@ -93,15 +101,19 @@ async function withRestoredClient<T>(
 }
 
 describe('the committed P02 fixture', () => {
-  it('restores and needs no further migration', async () => {
+  it('restores and migrates forward through exactly the post-dump files', async () => {
     const empty = await createEmptyDatabase();
     try {
       restoreAsMigrationOwner(empty.ownerUrl, empty.name);
 
       const result = await migrate({ connectionString: empty.ownerUrl, ledgerBucketCount: 32 });
 
-      // Zero, not "only some": every file in the dump's history is already recorded as applied.
-      expect(result.applied).toEqual([]);
+      // The dump was taken at 0290. Exactly the review fixes apply on top of it, in order, and they
+      // validate against populated rows rather than an empty schema; nothing earlier re-applies.
+      expect(result.applied).toEqual(MIGRATIONS_AFTER_DUMP);
+
+      const again = await migrate({ connectionString: empty.ownerUrl, ledgerBucketCount: 32 });
+      expect(again.applied).toEqual([]);
     } finally {
       await empty.drop();
     }

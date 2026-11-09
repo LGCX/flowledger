@@ -54,8 +54,8 @@ async function insertIdempotency(
      VALUES ($1, $2, $3, sha256(convert_to($4, 'UTF8')), $5, $4,
              CASE WHEN $2 = 'CREATE_PAYMENT' THEN 201 ELSE 202 END,
              jsonb_build_object('id', $4), '{"content-type":"application/json"}'::jsonb,
-             sha256(convert_to($4, 'UTF8')), $6, $7, clock_timestamp(),
-             clock_timestamp() + interval '90 days')`,
+             sha256(convert_to($4, 'UTF8')), $6, $7, statement_timestamp(),
+             statement_timestamp() + interval '2160 hours')`,
     [
       merchant.merchantId,
       commandType,
