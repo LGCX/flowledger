@@ -41,6 +41,23 @@ In Draft 2020-12, `format` may otherwise be annotation-only. A validator configu
 
 Public entity IDs use a lower-case prefix, `_`, and a canonical 26-character Crockford ULID. The first ULID character is `0`–`7`; `I`, `L`, `O`, and `U` are forbidden. Envelope IDs and domain-event IDs are UUIDs, not prefixed entity IDs.
 
+`common/entity-ids.v1.schema.json` is also the single registry of every ID prefix the contracts use, including prefixes whose identifiers are database-only and never appear on the wire. Those definitions carry a `description` saying so, and no schema may reference one from a wire-visible position:
+
+| Prefix | Definition | Reachability |
+| --- | --- | --- |
+| `mcr_` | `merchantApiCredentialId` | Database-only (`identity.merchant_api_credentials.id`) |
+| `pac_` | `providerAccountCredentialId` | Database-only (`providers.provider_account_credentials.id`) |
+| `pwe_` | `providerWebhookEndpointId` | Database-only (`providers.webhook_endpoints.id`) |
+| `fee_` | `feePolicyId` | Database-only (`payments.fee_policies.id`) |
+| `pno_` | `providerNotificationId` | Database-only (`providers.provider_notifications.id`) |
+| `pev_` | `providerEvidenceId` | Database-only (`providers.provider_evidence.id`) |
+| `led_` | `ledgerId` | Database-only (`ledger.ledgers.id`) |
+| `lac_` | `ledgerAccountId` | Database-only (`ledger.accounts.id`) |
+| `lcr_` | `ledgerCorrectionRequestId` | Database-only (`ledger.correction_requests.id`) |
+| `req_` | `requestId` | Wire-visible (`X-Request-Id`, `Problem.requestId`) |
+
+A prefixed identifier in the contracts that appears in neither the wire set nor the database-only set is a contract defect, not an implementer's choice.
+
 All monetary values are decimal strings in minor units. The maximum accepted value is `1000000000000`. A JavaScript JSON number is invalid for money.
 
 ## Commands

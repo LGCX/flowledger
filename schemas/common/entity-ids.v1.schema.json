@@ -51,6 +51,56 @@
     "settlementBatchId": {
       "type": "string",
       "pattern": "^sbt_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "requestId": {
+      "description": "Server-generated HTTP attempt identifier (`X-Request-Id`, `Problem.requestId`). Wire-visible.",
+      "type": "string",
+      "pattern": "^req_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "merchantApiCredentialId": {
+      "description": "Database-only. `identity.merchant_api_credentials.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^mcr_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerAccountCredentialId": {
+      "description": "Database-only. `providers.provider_account_credentials.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^pac_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerWebhookEndpointId": {
+      "description": "Database-only. `providers.webhook_endpoints.id`, a provider ingress/signature configuration. Never appears on the wire; distinct from `webhookEndpointId` (`whe_`), which is a merchant webhook endpoint.",
+      "type": "string",
+      "pattern": "^pwe_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "feePolicyId": {
+      "description": "Database-only. `payments.fee_policies.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^fee_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerNotificationId": {
+      "description": "Database-only. `providers.provider_notifications.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^pno_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "providerEvidenceId": {
+      "description": "Database-only. `providers.provider_evidence.id`; never appears on the wire. Events carry a redacted `redactedEvidenceRef` string, not this identifier.",
+      "type": "string",
+      "pattern": "^pev_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "ledgerId": {
+      "description": "Database-only. `ledger.ledgers.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^led_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "ledgerAccountId": {
+      "description": "Database-only. `ledger.accounts.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^lac_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "ledgerCorrectionRequestId": {
+      "description": "Database-only. `ledger.correction_requests.id`; never appears on the wire.",
+      "type": "string",
+      "pattern": "^lcr_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
     }
   }
 }
