@@ -190,8 +190,13 @@ These are contract questions, not code defects. Changing code would mean choosin
    after 90 days (same merchant only). Needs a `docs(contracts):` ruling before P04.
 2. **Envelope hash byte form (risk R6, `0290:245`).** SHA-256 over `jsonb::text`, which is not RFC 8785:
    key order and whitespace differ from `canonical-json.ts`, contrary to A-02's "byte-identical" comment.
-   The relay, the inbox duplicate check and archive copy-verify (docs/07 §outbox) must agree on one byte
-   form. Needs a ruling before P05.
+   _Corrected after a sweep of the later plans:_ P05-T09 already hashes inbox rows the same way
+   (`sha256(convert_to(p_envelope::text, 'UTF8'))`), so outbox and inbox agree and this is not a P05
+   blocker. Two loose ends remain: P05-T10's dead-letter path hashes the **raw broker bytes**
+   (`envelope_hash = sha256(data)`), so a parseable envelope's DLQ hash will not equal its outbox/inbox
+   hash; and archive copy-verify (docs/07 §outbox, P10) must archive exactly the `jsonb::text` bytes.
+   Recommend: in P05-T10, hash the `jsonb::text` form when the payload parses and raw bytes only when it
+   does not; record R6 as decided in the P02 risk table.
 3. **API function-owner role (`0270:209`).** Works today; needs a CONVENTIONS §7 decision before P04 adds
    more `api` functions, since the EXECUTE ACL is the only caller boundary.
 4. **DLQ failure-class names (R16, `0280:299`).** Invented strings; rule before P10 persists any.
@@ -201,6 +206,28 @@ These are contract questions, not code defects. Changing code would mean choosin
    `exclusive ⇒ no unresolved refunds` (docs/03 exclusion rules), and totals recomputed from operations.
    The property test's independent oracle now covers these in tests, but adding them to the checker means
    new `INVARIANT_IDS`, which the P01 plan enumerates — a plan decision, not mine to make.
+
+## Later-phase plan docs corrected by this review
+
+A sweep of `docs/execution-plan/tasks/P03`–`P13` for anything these fixes invalidate:
+
+- **P04-T04 Bearer authentication (`P04-merchant-api.md`).** Described the old `lookupCredential(client,
+locator)` that set `app.merchant_id` before verification. Rewritten to the new
+  `lookupCredential(client, locator, verify)` contract, and the interface table updated.
+- **P06-T11 provider evidence migration (`P06-providers-worker.md`).** Two CHECKs specified the same calendar-day bug
+  as 0270: `received_at + interval '7 days'` and `+ interval '90 days'`. Now `'168 hours'` and
+  `'2160 hours'`.
+- **P02 plan text** for the claim is annotated as superseded by 0291 (history kept).
+
+Checked and already consistent with the fixes: P05-T02 snapshots the fee from the payment-bound policy
+with the same HALF_UP formula as 0293's CHECK; P05/P06 already say a FAILED authorization leaves
+confirmed fields unchanged (the TypeScript was the deviation, not the plan); P05's authorization-ceiling
+tests raise from the acceptance guard before 0294's trigger could fire; P04's expiry tests use
+`fixtureInsertIdempotencyRecord`, which still works and now ages records on the database clock.
+
+Worth a look when P10 is planned in detail: its settlement example says "capture 10000 / fee 300". At
+the default fixture policy (290 bp + 30) a 10000 capture costs 320, and 0293 now rejects any other fee
+on a capture row. The example is consistent only if that test's merchant has a 300 bp / 0 fixed policy.
 
 ## Known residue, deliberately left
 
