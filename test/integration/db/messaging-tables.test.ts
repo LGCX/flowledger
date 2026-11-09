@@ -560,7 +560,7 @@ describe('dead letters', () => {
     await expect(
       runMapped(
         `UPDATE messaging.dead_letter_records
-            SET attempt_count = 6, last_failed_at = clock_timestamp()
+            SET attempt_count = 6, last_failed_at = last_failed_at + interval '1 second'
           WHERE id = $1`,
         [id],
       ),
