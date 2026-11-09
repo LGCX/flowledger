@@ -4,3 +4,4 @@ export * from './pool.js';
 export * from './roles.js';
 export * from './tx.js';
 export * from './repositories/identity.js';
+export * from './repositories/payments.js';

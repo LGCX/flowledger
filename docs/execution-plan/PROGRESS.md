@@ -1947,7 +1947,47 @@ Three real defects were found by running the code rather than reading it:
 3. The envelope builders must supply `id` themselves — `buildEnvelope` deliberately never invents one —
    and `requestedAmount` is a money object, not a string.
 
-**Next task:** `P02-T14`.
+## P02-T14 — Merchant-scoped repositories and the tenant-isolation / runtime-DML matrices
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T15.
+
+```text
+TASK P02-T14 — NEEDS-REVIEW
+Acceptance criteria:
+  - cross-tenant reads and references fail through every exposed role, view and function -> met
+    (RLS scoping per table, explicit predicate, binding FK, insert_outbox SUBJECT_NOT_FOUND)
+  - missing app.merchant_id sees no merchant data -> met (null context and empty string both: 0 rows)
+  - runtime roles cannot bypass transition functions with direct DML -> met (12 roles x 14 tables x 4
+    statements, plus EXECUTE denials on all three protected functions)
+  - the DML matrix fails when any table in the five schemas is absent from it -> met (enumerated from
+    information_schema with a floor assertion, so a new table breaks the test rather than escaping it)
+Tests added: test/integration/db/tenant-isolation.test.ts (11),
+  test/integration/db/runtime-role-dml.test.ts (4),
+  packages/database/src/repositories/payments.ts (findPayment, findOperation)
+  break-and-restore (each observed failing, then restored) — all three bit:
+    GRANT UPDATE ON payments.payments TO fl_api (handoff) -> the write case and the matrix fail
+    findPayment predicate removed                          -> the cross-tenant predicate case fails
+    baseline after restore                                 -> 15 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 379, e2e 0
+Deviations from the task text:
+  1. `fl_operator_command` holds *column-level* grants on identity.merchant_api_credentials, not table
+     -level ones, so the task's allowlist cell cannot be probed with a blanket statement. The cell is
+     excluded from the matrix and proven narrowly instead: issuing with the granted column list works,
+     revoking via status/revoked_at works, and rewriting credential_digest is refused with 42501.
+  2. The UPDATE probe names each table's first real column (read from information_schema). `SET ctid =
+     ctid` is refused with 0A000, which would have masked the privilege check behind a different error.
+  3. `withRole(ownerPool, 'fl_api', ...)` is refused ("permission denied to set role"): the migration
+     owner is a member of the function owners but not of fl_api. The tests connect through a role-scoped
+     pool, which is also closer to what the application does.
+Contract/plan issues found: none.
+Next task: P02-T15.
+```
+
+Worth recording: the explicit-predicate break *does* bite, because the repository is exercised on an
+owner connection that bypasses RLS. That is the point of having both guarantees — it proves the
+predicate is load-bearing rather than decorative behind a policy that already filters.
+
+**Next task:** `P02-T15`.
 
 
 
