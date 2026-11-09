@@ -68,30 +68,41 @@ reachable (`bp=10000, K=0, min=1`); the intermediate product is ≤ 10^16, insid
 documents. Default minimum is now 50 (matching the P02 dev seed and the P07 fixture);
 the accepted boundary example is minimum 31, where `fee == gross`.
 
-### Open items carried forward — **not** part of Step 1, need owner decision
+### Step 1b — plan reconciliation (owner-approved follow-ups)
 
-1. **P01-T04 golden case contradicts D-07.**
-   `tasks/P01-domain-kernel.md:328` lists `bp 290 / fixed 30 / minimum 30 accepted`
-   as a `checkFeePolicy` case, while the same task's own rule (line 280) rejects it
-   (`fee(30) = 31 > 30`). P01 starts immediately after P00-GATE, so this blocks
-   P01-T04. Not fixed: the file belongs to another phase and was outside the two
-   files the owner approved.
-2. **P05-T03 documents an uninsertable policy.** `tasks/P05-command-acceptance-messaging.md:155-157`
-   uses "policy: 290 bp, fixed 30, minimum 30" and asserts `capture 29 → CAPTURE_BELOW_MINIMUM`
-   with minimum 30. With a D-07-valid policy the minimum is 50 (fixture default) and
-   the boundary capture is 49.
-3. **R-01 in P00 still recommends the option D-06 rejected.**
-   `tasks/P00-repository-foundation.md:1056` recommends making `orderingKey` optional,
-   while its own "Binding until decided (README D-06)" clause and fix 6 say the key is
-   the endpoint ID. The recommendation column is stale; the conflict itself is closed
-   by fix 6.
-4. **`pm_sandbox_123` in P01 hash golden vectors.** `tasks/P01-domain-kernel.md:395-396`
-   use it as a canonical-request-hash input. Harmless — the hash does not depend on
-   token validity — but the fixture is a token the API would reject.
-5. **`fee_policies_minimum_capture` is now subsumed.** For any `bp ≥ 0`, a minimum
-   below the fixed component also violates `fee_within_minimum`. Both checks stay in
-   `docs/07`; P02-T07 notes that overlapping negatives must assert SQLSTATE `23514`
-   rather than a constraint name.
+**Status:** `DONE` — three `docs(plan):` commits, one per phase file, merged
+fast-forward into `main`. Resolves items 1–3 of the open list below.
 
-**Next task:** `P00-T01`, dependencies satisfied (no dependencies; Step 1 approved and
-merged).
+| Commit | File | Change |
+| --- | --- | --- |
+| `01469a6` | `tasks/P01-domain-kernel.md` | `checkFeePolicy` case `bp 290/30/min 30 accepted` → `min 31 accepted` + `min 30 rejected`; notes that `pm_sandbox_123` in the request-hash vectors is a synthetic input (digests unchanged) |
+| `ba22053` | `tasks/P05-command-acceptance-messaging.md` | documented policy floor 30 → 50 (matches P02-T07 fixture + dev seed); boundary capture 29 → 49; HTTP mapping `DETAIL` 30 → 50 |
+| `48619a6` | `tasks/P00-repository-foundation.md` | R-01 closed on D-06; the ordering rule `orderingKey === data.endpointId` is now enforced as `WEBHOOK_DELIVERY_ORDERING_KEY_EQUALS_ENDPOINT_ID` in both the `SemanticRule` union and the rule table, replacing three "not checked / blocked by R-01 / do not touch" instructions |
+
+**Verification:** all seven P01 `checkFeePolicy` cases recomputed against
+`floor((minimum*bp+5000)/10000) + fixed <= minimum` and confirmed; P05's documented
+`fee 320` and its `(0 bp, fixed 500, minimum 500)` example still hold; P01's eight
+golden vectors and both SHA-256 digests confirmed untouched; P00's `SemanticRule`
+union (16) reconciles with its rule table (13 rows, one collapsing the four
+`SETTLEMENT_*` rules); no "not checked", "blocked by R-01", or stale "no
+orderingKey" claim remains in any touched file.
+
+**Owner decisions taken during this step:** use the tightest boundary (31) for P01;
+align P05 to the fixture floor (50) rather than the tightest valid (31); leave the
+hash golden vectors alone and document the token as synthetic; commit one file per
+commit.
+
+### Open items carried forward
+
+4. **`pm_sandbox_123` in P01 hash golden vectors** — closed as *by design*: request
+   hashing never validates the token, the two digests are unchanged, and P01 now
+   says so in place. Revisit only if a future reader mistakes it for a valid token.
+5. **`fee_policies_minimum_capture` is subsumed by `fee_policies_fee_within_minimum`**
+   for any minimum below the fixed component. Deliberately left in place: keeping a
+   redundant safety `CHECK` is the safe default, and P02-T07 instructs overlapping
+   negatives to assert SQLSTATE `23514` rather than a constraint name.
+
+No blocking items remain before `P00-T01`.
+
+**Next task:** `P00-T01` — Workspace, toolchain pins, project references, and test
+projects. Dependencies: none. Step 1 approved and merged.
