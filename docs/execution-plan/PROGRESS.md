@@ -1343,7 +1343,39 @@ Contract/plan issues found: none.
 Next task: P01-GATE.
 ```
 
-**Next task:** `P01-GATE`.
+## P01-GATE — Domain-ready gate (M1)
+
+**Status:** `DONE` — gate passed locally; CI run on the gate commit.
+
+```text
+TASK P01-GATE — DONE
+Acceptance criteria:
+  - every docs/10 M1 AC bullet mapped to a passing test -> met, docs/evidence/P01.md
+  - parity test passes; fails if either side gains/loses a value -> met, 3 breaks (below)
+  - three random-seed runs recorded -> met, seeds 34389 / 16914 / 41115, all 580 passing
+Tests added: test/contract/domain-contract-parity.test.ts (19)
+Evidence: docs/evidence/P01.md
+  break-and-restore:
+    domain adds PLANNED to SUMMARY_STATUSES            -> Payment.summaryStatus fails
+    contract adds PLANNED to PaymentOperation.status    -> PaymentOperation.status fails
+      (only after `pnpm contracts:generate`; editing the YAML alone is invisible to the test,
+       which reads generated output — the honest form of that break)
+    domain adds a zz id prefix                          -> the prefix check fails
+    baseline after restore -> 19 passing
+Commands: pnpm check 0 | FC_NUM_RUNS=1000 test:unit 0 (580) | 3 seeds 0 (580 each)
+          contracts 19 files | verify-task --full 0
+Defect found and fixed before the gate: see fix a456324 (reopens P01-T03)
+Contract/plan issues found: none.
+Next task: P02-T01.
+```
+
+**The gate did its job: it found a real defect that 200-run properties never reached.**
+`FC_NUM_RUNS=1000` failed two P01-T03 timestamp properties because `fc.date` emits `Invalid Date`
+unless told not to. The code was right (`toTimestamp` throws on an Invalid Date — a programmer error,
+not client input) and the generator was wrong. Fixed test-only in `a456324`, merged before this gate,
+with P01-T03 recorded as reopened.
+
+**Next task:** `P02-T01`.
 
 
 
