@@ -256,4 +256,54 @@ Not applied: outside this task's Files list.
 Next task: P00-T04 (dependencies satisfied: yes — P00-T01).
 ```
 
-**Next task:** `P00-T04`, after owner approval.
+## P00-T04 — Inert NestJS application entry points (API + eight workers)
+
+**Status:** `NEEDS-REVIEW` — all gates green, awaiting owner approval before P00-T05.
+
+```text
+TASK P00-T04 — NEEDS-REVIEW
+Commit: 00c74c0 on task/p00-t04-app-entry-points
+Acceptance criteria:
+  - nine apps exist with the CONVENTIONS §3 names and `@flowledger/app-<dir>` -> met
+    (45 files: 9 x {package.json, tsconfig.json, src/{main,index,app.module}.ts})
+  - no main.ts reads process.env; only index.ts touches the process -> met (enforced by
+    a test, proven by break 5)
+  - app-startup.test.ts passes using only .env.example values -> met (14 cases)
+  - pnpm build emits apps/<app>/dist/index.js for all nine -> met (verified per app)
+  - node apps/api/dist/index.js and payment-worker start and exit 0 on SIGTERM -> met
+    (manual check: both exit 0)
+Tests added: test/contract/app-startup.test.ts :: 14 cases
+  break-and-restore (each observed failing, then restored):
+    api requires an extra var absent from .env.example -> 2 fail  [handoff item]
+    api /readyz returns 503                            -> 1 fails
+    api drops parseBaseConfig                          -> 1 fails
+    worker stop omits health.close()                   -> 1 fails
+    a main.ts reads process.env                        -> 1 fails
+    baseline after restore                             -> 14 passing
+Commands: pnpm check -> 0 (14 startup + 66 contract) | pnpm build -> 0
+          pnpm test:integration -> 0 | pnpm test:e2e -> 0
+          clean clone (committed state): install --frozen-lockfile 0, check 0, build 0
+Deviations from the task text:
+  1. The startup test imports each app relatively (`../../apps/<app>/src/main.js`)
+     rather than as `@flowledger/app-<app>/main`. Verified cause: vitest externalises
+     workspace packages, so the bare specifier resolves through Node and picks the
+     package's `default` export condition -> unbuilt `dist/main.js`
+     (ERR_MODULE_NOT_FOUND). `server.deps.inline` did not change it. The relative form
+     passes under vitest and under `tsc -b` (the test project references the apps).
+  2. Per owner decision, the readiness case asserts ready-before-stop and
+     port-released-after-stop instead of racing the microsecond window between
+     `setReady(false)` and `health.close()` inside `await ctx.close()`. The 503
+     transition is covered exactly by P00-T03's `/readyz` case.
+Contract/plan issues found: the `@flowledger/source` condition does not rescue bare
+workspace specifiers in vitest, and `node_modules/@flowledger` contains only packages
+the root manifest depends on. Any later `test/contract` file importing
+`@flowledger/<package>` will hit the same wall — and P00-T05 extends this exact test
+file. Recommended `docs(plan)`/config follow-up for the task that first needs it: add
+the workspace packages to root devDependencies AND inline them in vitest
+(`test.server.deps.inline` per project, not only at the root project, since the named
+projects define their own `test` blocks). Not applied: `vitest.config.ts` is outside
+this task's Files list.
+Next task: P00-T05 (dependencies satisfied: yes — P00-T01).
+```
+
+**Next task:** `P00-T05`, after owner approval.
