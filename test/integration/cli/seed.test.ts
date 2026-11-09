@@ -104,7 +104,7 @@ describe('seed', () => {
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       const found = await withTransaction(database.ownerPool, {}, (client) =>
-        lookupCredential(client, row.key_prefix),
+        lookupCredential(client, row.key_prefix, (stored) => stored !== null),
       );
       expect(found?.id, `prefix ${row.key_prefix}`).toBe(row.id);
 
@@ -140,6 +140,24 @@ describe('seed', () => {
 
     expect(result.exitCode).toBe(1);
     expect(sink.lines).toContain('seed refused in production');
+  });
+
+  it('refuses when NODE_ENV is unset or unrecognised, and writes nothing', async () => {
+    const before = await countsByTable();
+    for (const nodeEnv of [undefined, '', 'prod', 'staging']) {
+      const sink = capture();
+      const rest: NodeJS.ProcessEnv = { ...env };
+      delete rest.NODE_ENV;
+      const result = await seedCommand(
+        ['--profile', 'dev'],
+        nodeEnv === undefined ? rest : { ...rest, NODE_ENV: nodeEnv },
+        sink.out,
+      );
+      expect(result.exitCode, `NODE_ENV=${String(nodeEnv)}`).toBe(1);
+      expect(result.credentials).toEqual([]);
+      expect(sink.lines).toContain('seed refused: NODE_ENV must be development or test');
+    }
+    expect(await countsByTable()).toEqual(before);
   });
 
   it('resolves the default route for both merchants', async () => {
@@ -181,6 +199,25 @@ describe('credentials', () => {
     const again = capture();
     expect(await credentialsCommand(['revoke', '--id', credentialId], env, again.out)).toBe(1);
     expect(again.lines).toContain('not found or already revoked');
+  });
+
+  it('refuses to issue outside development or test, printing and storing no credential', async () => {
+    const before = await countsByTable();
+    for (const nodeEnv of ['production', undefined, 'staging']) {
+      const sink = capture();
+      const rest: NodeJS.ProcessEnv = { ...env };
+      delete rest.NODE_ENV;
+      const code = await credentialsCommand(
+        ['issue', '--merchant', 'mer_0000000000000000000000DEVA', '--scopes', 'payments:read'],
+        nodeEnv === undefined ? rest : { ...rest, NODE_ENV: nodeEnv },
+        sink.out,
+      );
+      expect(code, `NODE_ENV=${String(nodeEnv)}`).toBe(1);
+      expect(sink.lines).toEqual([
+        'credentials issue refused: NODE_ENV must be development or test',
+      ]);
+    }
+    expect(await countsByTable()).toEqual(before);
   });
 
   it('refuses a scope outside the allowlist', async () => {

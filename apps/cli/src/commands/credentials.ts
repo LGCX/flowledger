@@ -15,6 +15,8 @@ import pg from 'pg';
 
 import { CliConfigError, loadCliConfig } from '@flowledger/config';
 
+import { isLocalEnvironment } from './local-only.js';
+
 const EXIT_OK = 0;
 const EXIT_FAILED = 1;
 const EXIT_USAGE = 64;
@@ -111,6 +113,12 @@ async function issue(
   const merchantId = option(argv, '--merchant');
   const scopeList = option(argv, '--scopes');
   const expiresAt = option(argv, '--expires-at');
+
+  // Issuing prints a raw `fl_test_` credential; revoking prints nothing secret and stays available.
+  if (!isLocalEnvironment(env)) {
+    out('credentials issue refused: NODE_ENV must be development or test');
+    return EXIT_FAILED;
+  }
 
   if (merchantId === null || scopeList === null) {
     out(

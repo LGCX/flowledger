@@ -11,6 +11,11 @@ production`. A secret therefore cannot leak through a crash log.
 **Test mode.** `NODE_ENV=test` starts every app using only `infra/docker/.env.example` values. No
 application requires an undocumented secret to boot (docs/10 §M0).
 
+**Commands that print a credential.** `flowledger seed` and `flowledger credentials issue` print a raw
+synthetic `fl_test_` credential once, so they run only when `NODE_ENV` is `development` or `test`. An
+unset or unrecognised `NODE_ENV` is refused like `production`; `infra/docker/.env.example` sets
+`development`. `credentials revoke` prints nothing secret and is not restricted.
+
 **Adding a variable.** Every task that adds a variable appends a row to the table below _and_ a line
 to `infra/docker/.env.example` in the same commit. A test in `packages/config/src/base.test.ts`
 fails when the two lists disagree.

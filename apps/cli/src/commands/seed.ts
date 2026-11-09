@@ -15,6 +15,8 @@ import pg from 'pg';
 
 import { CliConfigError, loadCliConfig } from '@flowledger/config';
 
+import { isLocalEnvironment } from './local-only.js';
+
 const MERCHANT_A = 'mer_0000000000000000000000DEVA';
 const MERCHANT_B = 'mer_0000000000000000000000DEVB';
 
@@ -95,9 +97,14 @@ export async function seedCommand(
     return { exitCode: EXIT_FAILED, credentials: [] };
   }
 
-  // A seed writes credentials in clear text to stdout; that must never happen in production.
+  // A seed writes credentials in clear text to stdout; that must never happen in production, nor
+  // anywhere NODE_ENV fails to say the database is local.
   if (env.NODE_ENV === 'production') {
     out('seed refused in production');
+    return { exitCode: EXIT_FAILED, credentials: [] };
+  }
+  if (!isLocalEnvironment(env)) {
+    out('seed refused: NODE_ENV must be development or test');
     return { exitCode: EXIT_FAILED, credentials: [] };
   }
 

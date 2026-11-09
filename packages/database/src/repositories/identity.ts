@@ -7,8 +7,10 @@
  * that impossible.
  *
  * `lookupCredential` sets `app.credential_key_prefix` before reading. That is what the RLS policy
- * consults to expose exactly one row before tenant context exists. It then sets `app.merchant_id` from
- * the row it found, so the rest of the transaction runs in tenant scope.
+ * consults to expose exactly one row before tenant context exists. Only once the caller's `verify`
+ * accepts the stored digest does it set `app.merchant_id`, so the rest of the transaction runs in that
+ * merchant's scope. The prefix is the non-secret, loggable half of a credential: entering tenant scope
+ * on a prefix match alone would put a transaction in a stranger's tenant on nothing but a guess.
  */
 import type pg from 'pg';
 
@@ -38,8 +40,20 @@ interface CredentialRowShape {
   expires_at: Date | null;
 }
 
+/** The stored half of a credential, in the shape `verifyCredential` takes. */
+export interface StoredCredentialDigest {
+  readonly digest: Buffer;
+  readonly digestVersion: number;
+}
+
 /**
- * Finds the ACTIVE, unexpired credential for a locator and the owning merchant's status.
+ * Finds the ACTIVE, unexpired credential for a locator, verifies it, and only then enters the owning
+ * merchant's tenant scope and reads its status.
+ *
+ * `verify` is called exactly once: with the stored digest when a candidate row exists, and with null
+ * when none does, so the lookup-miss path still computes one HMAC (pass
+ * `(stored) => verifyCredential(raw, stored, peppers)`). A failed verification returns null and leaves
+ * the transaction with no tenant context.
  *
  * Returns null for expired and revoked credentials rather than returning them with a flag: a caller
  * that has to remember to check is a caller that will forget, and the contract says authentication
@@ -48,11 +62,12 @@ interface CredentialRowShape {
 export async function lookupCredential(
   client: pg.ClientBase,
   keyPrefix: string,
+  verify: (stored: StoredCredentialDigest | null) => boolean,
 ): Promise<CredentialRow | null> {
   await client.query("SELECT set_config('app.credential_key_prefix', $1, true)", [keyPrefix]);
 
-  // Two steps, not a join: the merchant policy requires `app.merchant_id`, which is only known after
-  // the credential row is found. A join here would return nothing and look like a missing credential.
+  // Two steps, not a join: the merchant policy requires `app.merchant_id`, which is only set after
+  // the credential row is found and verified. A join here would return nothing.
   const { rows } = await client.query<CredentialRowShape>(
     `SELECT id, merchant_id, key_prefix, credential_digest, digest_version,
             scopes, status, expires_at
@@ -64,10 +79,16 @@ export async function lookupCredential(
     [keyPrefix],
   );
 
-  const row = rows[0];
-  if (row === undefined) return null;
+  // The locator has done its job; nothing later in the transaction should see rows through it.
+  await client.query("SELECT set_config('app.credential_key_prefix', '', true)");
 
-  // The transaction is now in tenant scope for everything that follows.
+  const row = rows[0];
+  const verified = verify(
+    row === undefined ? null : { digest: row.credential_digest, digestVersion: row.digest_version },
+  );
+  if (row === undefined || !verified) return null;
+
+  // Verified: the transaction is now in tenant scope for everything that follows.
   await client.query("SELECT set_config('app.merchant_id', $1, true)", [row.merchant_id]);
 
   const merchant = await client.query<{ status: MerchantStatus }>(

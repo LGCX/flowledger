@@ -17,6 +17,7 @@ import {
   lookupCredential,
   revokeCredential,
   withTransaction,
+  type StoredCredentialDigest,
 } from '@flowledger/database';
 import {
   assertConstraintCoverage,
@@ -25,6 +26,9 @@ import {
   useTestDatabase,
   type TestDatabase,
 } from '@flowledger/testkit';
+
+/** Accepts any stored digest: these cases are about lookup filtering, not the HMAC. */
+const ACCEPT = (stored: StoredCredentialDigest | null): boolean => stored !== null;
 
 beforeAll(() => {
   setTestConnection(inject('flowledgerPg'));
@@ -432,7 +436,7 @@ describe('repository', () => {
     );
 
     const found = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, credential.keyPrefix),
+      lookupCredential(client, credential.keyPrefix, ACCEPT),
     );
 
     expect(found).not.toBeNull();
@@ -442,9 +446,42 @@ describe('repository', () => {
     expect(found?.scopes).toEqual(['payments:read']);
   });
 
+  it('enters no tenant scope and returns null when verification fails', async () => {
+    const { keyPrefix } = await insertCredential();
+    const seen: (StoredCredentialDigest | null)[] = [];
+    const scope = await withTransaction(database.poolAs('fl_api'), {}, async (client) => {
+      const found = await lookupCredential(client, keyPrefix, (stored) => {
+        seen.push(stored);
+        return false;
+      });
+      const settings = await client.query<{ merchant: string | null; prefix: string | null }>(
+        `SELECT nullif(current_setting('app.merchant_id', true), '') AS merchant,
+                nullif(current_setting('app.credential_key_prefix', true), '') AS prefix`,
+      );
+      // With neither setting, RLS shows fl_api no credential row at all.
+      const visible = await client.query('SELECT 1 FROM identity.merchant_api_credentials');
+      return { found, ...settings.rows[0], visible: visible.rowCount };
+    });
+    expect(scope).toEqual({ found: null, merchant: null, prefix: null, visible: 0 });
+    // The verifier saw the stored digest, so the miss and mismatch paths both compute an HMAC.
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.digest).toHaveLength(32);
+  });
+
+  it('still calls the verifier once on a lookup miss, with null', async () => {
+    const seen: (StoredCredentialDigest | null)[] = [];
+    await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
+      lookupCredential(client, 'ZZZZZZZZZZZY', (stored) => {
+        seen.push(stored);
+        return true;
+      }),
+    );
+    expect(seen).toEqual([null]);
+  });
+
   it('returns null for an unknown prefix', async () => {
     const found = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, 'ZZZZZZZZZZZZ'),
+      lookupCredential(client, 'ZZZZZZZZZZZZ', ACCEPT),
     );
     expect(found).toBeNull();
   });
@@ -452,7 +489,7 @@ describe('repository', () => {
   it('returns null for an expired credential', async () => {
     const { keyPrefix } = await insertCredential({ expires_at: new Date(Date.now() - 1_000) });
     const found = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, keyPrefix),
+      lookupCredential(client, keyPrefix, ACCEPT),
     );
     expect(found).toBeNull();
   });
@@ -474,7 +511,7 @@ describe('repository', () => {
     expect(revoked).toBe(true);
 
     const found = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, keyPrefix),
+      lookupCredential(client, keyPrefix, ACCEPT),
     );
     expect(found).toBeNull();
   });
@@ -499,10 +536,10 @@ describe('repository', () => {
     const fresh = await insertCredential({ merchant_id: MERCHANT_B });
 
     const foundOld = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, old.keyPrefix),
+      lookupCredential(client, old.keyPrefix, ACCEPT),
     );
     const foundFresh = await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-      lookupCredential(client, fresh.keyPrefix),
+      lookupCredential(client, fresh.keyPrefix, ACCEPT),
     );
     expect([foundOld?.id, foundFresh?.id]).toEqual([old.id, fresh.id]);
 
@@ -512,12 +549,12 @@ describe('repository', () => {
 
     expect(
       await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-        lookupCredential(client, old.keyPrefix),
+        lookupCredential(client, old.keyPrefix, ACCEPT),
       ),
     ).toBeNull();
     expect(
       await withTransaction(database.poolAs('fl_api'), {}, async (client) =>
-        lookupCredential(client, fresh.keyPrefix),
+        lookupCredential(client, fresh.keyPrefix, ACCEPT),
       ),
     ).not.toBeNull();
   });
