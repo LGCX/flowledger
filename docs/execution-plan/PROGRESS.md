@@ -1541,7 +1541,60 @@ freshly generated `fl_test_<random>_<random>` in a temp dir is still flagged (ex
 problem is always a red run after pushing. Adding `gitleaks git` to `scripts/verify-task.mjs` would close
 it; not done here because it needs a gitleaks binary on the developer machine.
 
-**Next task:** `P02-T05`.
+## P02-T05 — Migration 0210: identity tables and credential repository
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T06.
+
+```text
+TASK P02-T05 — NEEDS-REVIEW
+Acceptance criteria:
+  - every named constraint has a negative test (assertConstraintCoverage) -> met, 12 + 6 names
+  - digest, merchant_id, created_at, key_prefix, scopes, digest_version, expires_at immutable -> met,
+    enforced by the guard trigger for the owner role too
+  - revocation is one-way and requires revoked_at; expired/revoked never returned -> met
+  - fl_api cannot insert/update/delete; operator can insert and revoke but not change a digest -> met
+  - missing app.merchant_id and missing prefix -> fl_api sees no rows -> met
+Tests added: test/integration/db/identity.test.ts (48)
+  break-and-restore (each observed failing, then restored) — all seven bit:
+    merchants policy -> USING (true)          -> 3 cases fail
+    credentials policy -> USING (true)        -> 4 cases fail  (handoff item: both RLS policies)
+    scopes allowlist CHECK removed            -> that case fails
+    revocation one-way guard removed          -> 2 cases fail
+    expires_at dropped from the guard list    -> that case fails
+    operator UPDATE widened to the whole row  -> the digest case fails
+    fl_api granted UPDATE                     -> the privilege case fails
+    baseline after restore                    -> 48 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 117, e2e 0
+Deviations from the task text:
+  1. The two guard functions (`fl_merchant_guard`, `fl_credential_guard`) live in 0210, not 0200:
+     0200 is already applied on developer databases and the task forbids touching it. 0210 also grants
+     fl_assert_unchanged to fl_operator_command, which 0200 granted only to function owners — without
+     it the operator's revoke fails with "permission denied for function".
+  2. `lookupCredential` reads the credential first, then sets app.merchant_id, then reads the
+     merchant's status. The task's prose implies a single join; a join returns nothing because the
+     merchant policy needs app.merchant_id, which is only known after the credential is found.
+  3. Three CHECK constraints (status, revoked_at pair) are unreachable via INSERT: the guard rejects
+     any non-ACTIVE insert first. They are tested through UPDATE, which is the only path that reaches
+     them.
+  4. `assertConstraintCoverage` now includes contype 'p'. Without it a `*_pkey` can be declared but
+     never found, so the helper reported it "declared but absent".
+  5. The P02-T03 assertion "runtime roles have no schema USAGE" was replaced with "no runtime role has
+     CREATE on any contract schema". 0210 grants USAGE on `identity` by design, so the old assertion
+     was false; CREATE is the invariant that must hold for every role at every phase.
+Contract/plan issues found: none.
+Next task: P02-T06.
+```
+
+**Four defects the tests found in my own work**, each before commit:
+1. `lookupCredential` joined `merchants` before tenant context existed, so RLS hid the row and every
+   login would have failed with "credential not found".
+2. Test ids were 27 characters; the contract's ULID pattern is 26, so `fl_is_id` rejected them.
+3. The guard's `fl_assert_unchanged` was not granted to `fl_operator_command`, so revoking a credential
+   failed with a permission error.
+4. My prefix generator was not injective (`padStart` + a character substitution could collide), which
+   surfaced as a duplicate-key failure. It is now a direct base-32 encoding of the counter.
+
+**Next task:** `P02-T06`.
 
 
 

@@ -134,14 +134,17 @@ describe('schemas', () => {
     }
   });
 
-  it('leaves the runtime roles without schema access yet (grants arrive per table)', async () => {
-    for (const role of ['fl_api', 'fl_relay', 'fl_payment_worker'] as const) {
+  it('gives no runtime role CREATE on any contract schema', async () => {
+    // Whether a role has USAGE changes as table tasks grant it, so that is asserted where the grant
+    // is made (P02-T05 onward). What must never be true is CREATE: a runtime role that could create
+    // an object in `payments` could shadow a table a protected function trusts.
+    for (const role of LOGIN_RUNTIME_ROLES) {
       for (const schema of SCHEMAS) {
-        const { rows } = await database.ownerPool.query<{ usage: boolean }>(
-          `SELECT has_schema_privilege($1, $2, 'USAGE') AS usage`,
+        const { rows } = await database.ownerPool.query<{ can_create: boolean }>(
+          `SELECT has_schema_privilege($1, $2, 'CREATE') AS can_create`,
           [role, schema],
         );
-        expect(rows[0]?.usage, `${role} on ${schema}`).toBe(false);
+        expect(rows[0]?.can_create, `${role} CREATE on ${schema}`).toBe(false);
       }
     }
   });

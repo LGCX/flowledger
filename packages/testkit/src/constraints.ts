@@ -28,7 +28,8 @@ export async function assertConstraintCoverage(
            END AS kind
       FROM pg_constraint
      WHERE conrelid = $1::regclass
-       AND contype IN ('c', 'f', 'u', 'x')
+       -- 'p' included: a primary key is a constraint a task must name like any other.
+       AND contype IN ('c', 'f', 'u', 'x', 'p')
     UNION
     SELECT indexrelid::regclass::text AS name, 'unique index' AS kind
       FROM pg_index
