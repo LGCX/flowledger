@@ -7,6 +7,8 @@
  * with no event for the workers to act on.
  */
 import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
@@ -52,8 +54,13 @@ describe('migration history', () => {
       // sequence is what proves the numbered batches mean what they say.
       expect([...first.applied]).toEqual([...first.applied].sort());
       expect(first.applied[0]).toMatch(/^0200_/);
-      // 0291–0294 are the review fixes to M2 (forward-only: 0270, 0280 and 0250 are frozen).
-      expect(first.applied.at(-1)).toMatch(/^0294_/);
+      // Every file in the directory applies, read from disk so a later phase's 0300+ files extend this
+      // rather than break it. 0291–0294 are the review fixes to M2 (0250, 0270, 0280 are frozen).
+      const files = readdirSync(join(import.meta.dirname, '..', '..', '..', 'migrations'))
+        .filter((name) => name.endsWith('.sql'))
+        .sort();
+      expect([...first.applied]).toEqual(files);
+      expect(first.applied).toContain('0294_authorization_attempt_limit.sql');
 
       const second = await migrate({ connectionString: empty.ownerUrl, ledgerBucketCount: 32 });
       expect(second.applied).toEqual([]);

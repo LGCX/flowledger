@@ -3,8 +3,9 @@
  *
  * This is the test that decides whether `test/fixtures/db/P02.sql` is worth committing. It restores the
  * dump into an empty database and runs the real migration runner against it. The dump was taken at 0290;
- * the runner must apply exactly the files added since (the P02 review fixes, 0291–0294) and nothing
- * else, which is also the proof that those forward migrations hold against populated M2 data.
+ * the runner must apply exactly the files added since — the P02 review fixes 0291–0294 first, then any
+ * later phase's files — and nothing else, which is also the proof that those forward migrations hold
+ * against populated M2 data.
  *
  * Two details are load-bearing. The restore runs as `fl_migration_owner`, not as the superuser: with
  * `--no-owner` in the dump, restored objects belong to whoever runs `psql`, and a superuser-owned schema
@@ -13,7 +14,7 @@
  * protocol a simple `query()` cannot speak.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import pg from 'pg';
@@ -27,13 +28,24 @@ import {
   type TestDatabase,
 } from '@flowledger/testkit';
 
-/** Files added after the dump was generated (the P02 review fixes). */
-const MIGRATIONS_AFTER_DUMP = [
+/** The last migration recorded in the committed dump. */
+const DUMP_HEAD = '0290_insert_outbox.sql';
+
+/** The P02 review fixes, which must be among the files applied on top of the dump. */
+const P02_REVIEW_MIGRATIONS = [
   '0291_idempotency_replay_window.sql',
   '0292_outbox_derivation.sql',
   '0293_fee_snapshot_binding.sql',
   '0294_authorization_attempt_limit.sql',
 ];
+
+/**
+ * Every migration file newer than the dump, read from the directory rather than listed by hand, so a
+ * later phase adding `0300_*` extends the expectation instead of breaking a P02 test it may not edit.
+ */
+const MIGRATIONS_AFTER_DUMP = readdirSync(join(import.meta.dirname, '..', '..', '..', 'migrations'))
+  .filter((name) => name.endsWith('.sql') && name > DUMP_HEAD)
+  .sort();
 
 const FIXTURE = join(import.meta.dirname, '..', '..', 'fixtures', 'db', 'P02.sql');
 
@@ -111,6 +123,7 @@ describe('the committed P02 fixture', () => {
       // The dump was taken at 0290. Exactly the review fixes apply on top of it, in order, and they
       // validate against populated rows rather than an empty schema; nothing earlier re-applies.
       expect(result.applied).toEqual(MIGRATIONS_AFTER_DUMP);
+      expect(result.applied.slice(0, P02_REVIEW_MIGRATIONS.length)).toEqual(P02_REVIEW_MIGRATIONS);
 
       const again = await migrate({ connectionString: empty.ownerUrl, ledgerBucketCount: 32 });
       expect(again.applied).toEqual([]);
