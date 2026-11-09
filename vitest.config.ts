@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
-const shared = { resolve: { conditions: ['@flowledger/source'] } };
+const shared = {
+  resolve: { conditions: ['@flowledger/source'] },
+  server: { deps: { inline: [/@flowledger\//] } },
+};
 
 export default defineConfig({
   test: {

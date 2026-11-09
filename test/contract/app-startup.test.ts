@@ -29,25 +29,22 @@ interface AppMain {
   start(env: StartupEnv): Promise<RunningApp>;
 }
 
-// One literal specifier per app. These are RELATIVE rather than
-// `@flowledger/app-<app>/main` on purpose: vitest externalises workspace packages, so a
-// bare specifier resolves through Node to the unbuilt `dist/main.js`. See the task
-// report in PROGRESS.md for the underlying config gap. The import stays dynamic, so each
-// app's module is loaded lazily by the case that needs it.
+// One literal specifier per app: a computed `import()` of a variable path cannot be
+// resolved statically, so the laziness is made explicit here.
 const LOADERS: Record<AppName, () => Promise<AppMain>> = {
-  api: () => import('../../apps/api/src/main.js') as Promise<AppMain>,
-  'outbox-relay': () => import('../../apps/outbox-relay/src/main.js') as Promise<AppMain>,
-  'payment-worker': () => import('../../apps/payment-worker/src/main.js') as Promise<AppMain>,
+  api: () => import('@flowledger/app-api/main') as Promise<AppMain>,
+  'outbox-relay': () => import('@flowledger/app-outbox-relay/main') as Promise<AppMain>,
+  'payment-worker': () => import('@flowledger/app-payment-worker/main') as Promise<AppMain>,
   'provider-webhook-receiver': () =>
-    import('../../apps/provider-webhook-receiver/src/main.js') as Promise<AppMain>,
+    import('@flowledger/app-provider-webhook-receiver/main') as Promise<AppMain>,
   'provider-webhook-worker': () =>
-    import('../../apps/provider-webhook-worker/src/main.js') as Promise<AppMain>,
-  reconciler: () => import('../../apps/reconciler/src/main.js') as Promise<AppMain>,
-  'settlement-worker': () => import('../../apps/settlement-worker/src/main.js') as Promise<AppMain>,
+    import('@flowledger/app-provider-webhook-worker/main') as Promise<AppMain>,
+  reconciler: () => import('@flowledger/app-reconciler/main') as Promise<AppMain>,
+  'settlement-worker': () => import('@flowledger/app-settlement-worker/main') as Promise<AppMain>,
   'merchant-webhook-projector': () =>
-    import('../../apps/merchant-webhook-projector/src/main.js') as Promise<AppMain>,
+    import('@flowledger/app-merchant-webhook-projector/main') as Promise<AppMain>,
   'merchant-webhook-dispatcher': () =>
-    import('../../apps/merchant-webhook-dispatcher/src/main.js') as Promise<AppMain>,
+    import('@flowledger/app-merchant-webhook-dispatcher/main') as Promise<AppMain>,
 };
 
 /** The only configuration source for these tests: the checked-in example file. */

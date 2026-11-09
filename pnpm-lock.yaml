@@ -38,6 +38,30 @@ importers:
       '@flowledger/app-settlement-worker':
         specifier: workspace:*
         version: link:apps/settlement-worker
+      '@flowledger/config':
+        specifier: workspace:*
+        version: link:packages/config
+      '@flowledger/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
+      '@flowledger/database':
+        specifier: workspace:*
+        version: link:packages/database
+      '@flowledger/domain':
+        specifier: workspace:*
+        version: link:packages/domain
+      '@flowledger/messaging':
+        specifier: workspace:*
+        version: link:packages/messaging
+      '@flowledger/observability':
+        specifier: workspace:*
+        version: link:packages/observability
+      '@flowledger/providers':
+        specifier: workspace:*
+        version: link:packages/providers
+      '@flowledger/testkit':
+        specifier: workspace:*
+        version: link:packages/testkit
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
