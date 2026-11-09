@@ -6,3 +6,5 @@ export * from './postgres.js';
 export * from './prohibited-data.js';
 export * from './fixtures/merchant.js';
 export * from './fixtures/payments.js';
+export * from './fixtures/populate-p02.js';
+export * from './fixtures/p02-fixture.js';
