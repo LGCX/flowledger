@@ -5,10 +5,24 @@ committed. This file is updated **in the same commit as any version bump** (CONV
 
 ## Toolchain
 
+A pinned binary outside the package managers needs its integrity recorded too. gitleaks is
+downloaded by CI and verified before it runs:
+
+```text
+gitleaks_8.30.1_linux_x64.tar.gz
+sha256  551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+```
+
+The digest was confirmed by downloading the release asset and hashing it, then comparing with
+the published `gitleaks_8.30.1_checksums.txt`, rather than copied from the checksum file alone.
+On a bump: repeat that comparison, update both workflow variables and this file in the same
+commit.
+
 | Tool             | Pinned version    | Where pinned                                                           |
 | ---------------- | ----------------- | ---------------------------------------------------------------------- |
 | Node.js          | 24.22.1           | `.nvmrc`, `package.json#engines.node`                                  |
 | pnpm             | 10.34.9           | `package.json#packageManager` (Corepack)                               |
+| gitleaks         | 8.30.1            | `.github/workflows/ci.yml` (`GITLEAKS_VERSION`, `GITLEAKS_SHA256`)     |
 | PostgreSQL       | 17.11             | `compose.yaml`; `POSTGRES_IMAGE` in `packages/testkit/src/postgres.ts` |
 | Pub/Sub emulator | 592.0.0-emulators | `compose.yaml` image `gcr.io/google.com/cloudsdktool/google-cloud-cli` |
 | Jaeger           | 1.76.0            | `compose.yaml` image `jaegertracing/all-in-one`                        |

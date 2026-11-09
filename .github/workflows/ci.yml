@@ -1,0 +1,135 @@
+name: ci
+
+# Two lanes, deliberately separate. `fast` is the gate every push must clear in minutes;
+# `integration` starts a Docker stack and only runs once `fast` is green, so a lint error or a
+# dependency-policy violation never pays for containers.
+on: [push, pull_request]
+
+# Least privilege: nothing here writes to the repository or publishes anything.
+permissions:
+  contents: read
+
+# A newer push to the same ref makes the older run pointless; cancel it rather than letting two
+# runs compete for the same concurrency budget.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The gitleaks release to use. The checksum is verified below against the asset actually
+  # downloaded, so a tampered or replaced release fails the job instead of scanning with
+  # something unexpected. Pinned in docs/VERSIONS.md.
+  GITLEAKS_VERSION: '8.30.1'
+  GITLEAKS_SHA256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
+
+jobs:
+  fast:
+    name: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # fetch-depth: 0 because gitleaks scans history, not just the working tree.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Reads the pnpm version from package.json "packageManager", so the pin lives in one place.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: lint
+        run: pnpm lint
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: contracts drift
+        run: pnpm contracts:check
+
+      # The reporters run alongside `default`, so a failure still prints readably while the
+      # machine-readable files are produced for the artifact.
+      # No `--` before the flags: pnpm forwards it to vitest, which reads `--` as
+      # end-of-options and treats everything after it as file filters. The reporters then match
+      # no files, and `passWithNoTests` turns that into a green run with zero tests executed.
+      # `--passWithNoTests=false` makes any such mis-filtering fail instead of passing quietly.
+      - name: unit tests
+        run: |
+          mkdir -p reports
+          pnpm test:unit --reporter=default --reporter=junit \
+            --outputFile.junit=reports/unit-junit.xml --passWithNoTests=false
+
+      - name: contract tests
+        run: |
+          mkdir -p reports
+          pnpm test:contracts --reporter=default --reporter=junit \
+            --outputFile.junit=reports/contracts-junit.xml \
+            --reporter=json --outputFile.json=reports/contracts.json \
+            --passWithNoTests=false
+
+      - name: install gitleaks
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          curl -sSfL --retry 3 -o "${archive}" "${url}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "${archive}" gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # --redact keeps the offending value out of the log; --exit-code 1 makes a finding fatal.
+      - name: secret scan
+        run: gitleaks git --config .gitleaks.toml --redact --exit-code 1 .
+
+      # if: always() so the report exists for a failed run too — that is when it is wanted.
+      - name: upload contract validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-validation-report
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  integration:
+    name: integration
+    needs: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm build
+
+      - name: integration tests
+        run: |
+          mkdir -p reports
+          pnpm test:integration --reporter=default --reporter=junit \
+            --outputFile.junit=reports/integration-junit.xml --passWithNoTests=false
+
+      - name: upload integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-report
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn

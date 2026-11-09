@@ -178,4 +178,36 @@ describe('dependency policy', () => {
     );
     expect(findings).toHaveLength(3);
   });
+
+  /**
+   * The developer guide is the only place every command is listed together, and a script that
+   * exists but is undocumented is a script nobody runs. This also catches the reverse mistake:
+   * renaming a script leaves the guide describing a command that no longer exists, which the
+   * second assertion catches.
+   */
+  it('docs/DEVELOPMENT.md documents every root script', () => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const guide = readFileSync(join(repoRoot, 'docs', 'DEVELOPMENT.md'), 'utf8');
+
+    const undocumented = Object.keys(manifest.scripts).filter(
+      (script) => !guide.includes(`\`pnpm ${script}`),
+    );
+    expect(undocumented).toEqual([]);
+  });
+
+  it('docs/DEVELOPMENT.md names no command that does not exist', () => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const guide = readFileSync(join(repoRoot, 'docs', 'DEVELOPMENT.md'), 'utf8');
+
+    const documented = [...guide.matchAll(/`pnpm ([a-z][a-z:0-9-]*)(?=[\s`]|$)/g)].map(
+      (match) => match[1] as string,
+    );
+    const known = new Set([...Object.keys(manifest.scripts), 'install', 'exec', 'vitest']);
+    const unknown = [...new Set(documented)].filter((name) => !known.has(name));
+    expect(unknown).toEqual([]);
+  });
 });

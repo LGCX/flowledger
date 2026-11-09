@@ -20,7 +20,8 @@
     "db:down": "docker compose -f infra/docker/compose.yaml down -v",
     "contracts:generate": "node scripts/contracts-generate.mjs",
     "contracts:check": "node scripts/contracts-check.mjs",
-    "verify:task": "node scripts/verify-task.mjs"
+    "verify:task": "node scripts/verify-task.mjs",
+    "test:performance": "node test/performance/run.mjs"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "13.1.0",

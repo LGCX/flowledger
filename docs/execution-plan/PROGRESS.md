@@ -743,7 +743,61 @@ pattern has a mandatory capture group — so all tests still passed. That is exa
 mode CONVENTIONS §14.4 names (a test that cannot fail is not evidence), and the real break has
 to loosen `MIGRATION_NAME` itself.
 
-**Next task:** `P00-T14`.
+## P00-T14 — CI workflow, `test:performance` stub, and developer guide
+
+**Status:** `NEEDS-REVIEW` — every item verified except one that cannot be verified here: the
+handoff asks for "one CI run observed red for a deliberate lint error, then green", and this
+clone has **no git remote**, so no Actions run exists to observe.
+
+```text
+TASK P00-T14 — NEEDS-REVIEW
+Acceptance criteria:
+  - two jobs, integration depends on fast -> met
+  - contract report artifact uploaded even on failure -> `if: always()`, 30-day retention
+  - gitleaks pinned and checksum-verified -> 8.30.1; digest confirmed by hashing the downloaded
+    asset and comparing with the published checksums file, not by copying the file
+  - pnpm test:performance exits 0 with the P12 message -> met
+  - docs/DEVELOPMENT.md lists every root script -> met, enforced by two new test cases
+Local verification (no remote, so no Actions run):
+  actionlint 1.7.12 (downloaded to /tmp, not a repo dependency): exit 0, no findings
+  the exact vitest reporter invocations from the workflow were run locally and produced
+    reports/unit-junit.xml (11 KB), reports/contracts-junit.xml (121 KB),
+    reports/contracts.json (182 KB)
+  a deliberate lint error fails `pnpm lint` (exit 1) and a restored tree passes (exit 0)
+  scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Tests added: dependency-policy.test.ts +2 (guide documents every root script; guide names no
+  script that does not exist)
+  break-and-restore: script added but undocumented -> fails; script removed from the guide ->
+    fails; a nonexistent command added to the guide -> fails; baseline 12 passing
+Deviations from the task text:
+  1. The task's literal test command, `pnpm test:unit -- --reporter=...`, produces NO report and
+     exits 0: pnpm forwards `--` to vitest, which reads it as end-of-options and treats every
+     following argument as a file filter, so no files match and `passWithNoTests` (enabled in the
+     shared config) turns that into a green run of zero tests. The workflow omits the `--`
+     separator and adds `--passWithNoTests=false` so the same mistake fails loudly. Verified by
+     running both forms: the literal one writes nothing, the corrected one writes all three
+     reports. Documented in docs/DEVELOPMENT.md.
+  2. `docs/VERSIONS.md` is modified although the Files list names only `package.json`. The task
+     body requires the gitleaks version to be recorded there, so the Files list is incomplete.
+  3. `test/contract/dependency-policy.test.ts` is modified although not in the Files list: the
+     Testing requirements ask for a case in it. Same omission.
+  4. `mkdir -p reports` precedes each reporter invocation; `reports/` is gitignored, so it must
+     exist before vitest writes into it.
+  5. The `integration` job runs `pnpm build` before the tests. The task says "same setup", and a
+     clean Ubuntu runner has no `tsbuildinfo` cache, so this is the lane that proves the build
+     works without local caches.
+  6. `test/performance/run.mjs` imports `node:process` explicitly; the `.mjs` glob is linted and
+     `no-undef` applies there, as with the earlier scripts.
+Contract/plan issues found: the `--` defect in item 1 is a defect in the task text; the command
+  it specifies would create a CI job that runs no tests and reports success.
+Next task: P00-GATE.
+```
+
+**The `--` defect is the one to carry forward.** It is the same failure mode this project keeps
+finding — a green result that proves nothing — and it would have been invisible in a CI log,
+because the job would simply have said "no tests found" and passed.
+
+**Next task:** `P00-GATE`.
 
 
 
