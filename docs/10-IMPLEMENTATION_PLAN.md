@@ -143,7 +143,7 @@ Treat these numbers as a lower bound, not a forecast. Three things make them opt
 - Crash-point and concurrency tests are slow to write correctly and are where most of the real time goes. They are also the reason the project is worth building, so they cannot be the thing that gets cut.
 - AI assistance reduces scaffolding and test-authoring time. It does not reduce the database, concurrency, recovery, or benchmark verification work, which is the majority.
 
-The honest planning assumption is that a part-time single engineer should expect the upper end or beyond, and should prefer shipping M0-M7 with a working demo over reaching M13 with nothing runnable. Scope was already cut once for this reason: retention archival and dual-approval operator tooling came out of M11, and the real-provider adapter came out of M10.
+The honest planning assumption is that a part-time single engineer should expect the upper end or beyond, and should prefer shipping M0-M7 with a working demo over reaching M13 with nothing runnable. Scope was already cut once for this reason: retention archival and the full dual-approval operator tooling came out of M11, and the real-provider adapter came out of M10. The second-approver boundary itself was later restored: M10 ships the `correction request` and `correction approve` commands that drive the existing distinct-principal check.
 
 ## M0 — Repository and verification foundation
 
@@ -477,7 +477,7 @@ This milestone replaces the Stripe test-mode adapter that previously sat here. T
 
 ## M11 — Security, observability, and operator visibility
 
-This milestone was cut down deliberately. Retention archival jobs and the full dual-approval operator tooling were removed from the MVP: they are roughly a week of work that produces no portfolio evidence and no demonstrable property, and the contracts already specify them for a later release. Stating that limit is a better signal than building it.
+This milestone was cut down deliberately. Retention archival jobs and the full dual-approval operator tooling were removed from the MVP: they are roughly a week of work that produces no portfolio evidence and no demonstrable property, and the contracts already specify them for a later release. Stating that limit is a better signal than building it. What M10 ships is the safety boundary rather than the tooling around it: `correction request` and `correction approve` are two commands run by two different named operators, and the database rejects an approval by the requesting principal.
 
 What remains is everything that is either a security boundary or the evidence that the system behaves as claimed.
 
@@ -498,7 +498,7 @@ These remain specified in the data model and recovery contracts, and are listed 
 
 - Clock-driven copy-verify-tombstone archival for published outbox bodies, provider attempt and notification hot detail, successful merchant-webhook attempt bodies, resolved DLQ payloads, and expired API replay bodies. The MVP retains everything online; nothing is deleted, so no archival correctness risk exists.
 - Raw-quarantine object deletion by deadline. The MVP does not create raw quarantine objects at all, which removes the need rather than deferring the risk.
-- Second-approver enforcement for compensating ledger corrections. The correction request table, its approver column, and its distinct-principal check exist; the operator workflow that drives them is single-principal in the MVP and the limitation is documented.
+- Approver tiers, approval expiry, approval notifications, and any operator UI for compensating ledger corrections. The workflow itself is not deferred: M10 ships `correction request` and `correction approve` as two commands run by two different named operators, and the database rejects an approval by the requesting principal. What is deferred is the tooling around that boundary — tiers, expiry, notifications, and UI — not the second approver.
 
 ### Test and acceptance criteria
 

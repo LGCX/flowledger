@@ -76,7 +76,8 @@ Stated here rather than left for a reviewer to discover:
 - **No real-provider adapter.** The interface, capability model, and conformance suite are built for one; only the implementation is deferred. The payoff is that every test, chaos workload, and benchmark runs offline from a clean clone, and that timeouts-after-commit can be injected deterministically. A real sandbox can do neither. — [ADR-0011](docs/adr/0011-simulated-providers-only-in-mvp.md)
 - **Settlement is internal to the ledger.** Captures and refunds accumulate in a merchant clearing position and are closed into immutable batches that move value to merchant payable. No bank rails, no payout, no file formats. — [ADR-0012](docs/adr/0012-ledger-only-settlement.md)
 - **Single region, one currency, one capture per authorization.** Multi-region writes, FX, chargebacks, multiple captures, and subscriptions are out of scope with contracts that do not pretend otherwise.
-- **Retention archival and dual-approval operator tooling are specified but not built.** Nothing is deleted in the MVP, so deferring the archival jobs defers no correctness risk.
+- **Retention archival is specified but not built.** Nothing is deleted in the MVP, so deferring the archival jobs defers no correctness risk.
+- **Dual approval for ledger corrections *is* built; only the tooling around it is deferred.** `correction request` and `correction approve` are separate commands run by two different named operators, and the database rejects an approval by the requesting principal. Approver tiers, approval expiry, notifications, and any operator UI are deferred. — [`ledger.correction_requests`](docs/07-DATA_MODEL.md)
 - **No PCI certification or regulatory compliance claim.** Synthetic payment methods and simulated providers only.
 
 ## Contract map
