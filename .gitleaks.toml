@@ -1,0 +1,23 @@
+# gitleaks configuration (docs/10 §M0 "secret scanning").
+#
+# Default rules stay on: they cover the credential shapes a real leak would take. The only
+# allowlist entries are the files that must *contain* synthetic prohibited values in order to
+# test the detector and document the environment.
+#
+# Every allowlisted value is fabricated: the PAN is the standard Luhn-valid test number, and
+# the credentials use the documented `fl_test_` / `sim_*` prefixes with filler bodies. Nothing
+# here is a usable secret, so nothing here is a candidate for a real allowlist entry.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic prohibited-data fixtures used to test the detector"
+paths = [
+  '''packages/testkit/src/prohibited-data\.ts''',
+  '''packages/testkit/src/prohibited-data\.test\.ts''',
+  '''infra/docker/\.env\.example''',
+  # The execution plan specifies these synthetic values and quotes them verbatim in the task
+  # that creates them. It is not shipped, and its whole purpose is to name them.
+  '''docs/execution-plan/.*\.md''',
+]

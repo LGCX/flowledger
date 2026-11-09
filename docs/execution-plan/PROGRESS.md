@@ -665,7 +665,49 @@ reviewable, and CI is the shared enforcement point.
 
 `pnpm verify:task` is the entry point.
 
-**Next task:** `P00-T12`.
+## P00-T12 — Prohibited-data fixtures, detector, repository scan, gitleaks
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P00-T13.
+
+```text
+TASK P00-T12 — NEEDS-REVIEW
+Acceptance criteria:
+  - detector finds each of the seven fixture values with the correct kind -> met
+  - no false positive on max amount, IDs, 64-hex digest, timestamp, `Bearer ...` -> met
+  - assertNoProhibitedData never contains the matched text -> met
+  - repository scan finds nothing -> met
+Tests added: packages/testkit/src/prohibited-data.test.ts (18),
+             test/contract/prohibited-data-scan.test.ts (4)
+  break-and-restore (each observed failing, then restored):
+    Luhn check removed                -> Luhn-invalid case fails
+    CARD_FIELD detection removed      -> both CARD_FIELD cases fail
+    assert message echoes the match   -> "never the match" case fails
+    PAN planted in docs/07            -> contract scan fails
+    credential planted in a schema    -> contract scan fails
+    baseline after restore            -> 18 + 4 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. The contract scan excludes `docs/execution-plan/`. Those task files quote the synthetic
+     fixture values verbatim because they specify them, so scanning them reports the plan for
+     doing its job; it is neither shipped nor a contract. `schemas/`, `openapi/`, `docs/00`-
+     `docs/10` and `docs/adr/` are all scanned (48 files, with a floor and an explicit count of
+     the eleven numbered contract documents so a silently empty walk cannot pass). The same
+     directory is allowlisted in `.gitleaks.toml` for the same reason.
+  2. A test literal was wrong, not the detector: `4111111111111111111` is not Luhn-valid. The
+     19-digit case now uses `4111111111111111417`. The detector rejected the literal and the
+     assertion caught it, which is the intended direction of failure.
+Contract/plan issues found: the plan documents themselves contain the synthetic values they
+mandate; recorded above as a scoping decision rather than a defect.
+Next task: P00-T13.
+```
+
+**Notes worth keeping:**
+1. A-08 (13–14 digit runs are excluded so valid money amounts are not flagged) is exercised by
+   a test, so a later "widen the PAN rule" change must consciously break it.
+2. A-09 (simulator secret formats) is P06's to extend: `sim_sk_*` and `sim_whsec_*` are matched
+   here, and a different P06 format needs a new pattern, not a looser one.
+
+**Next task:** `P00-T13`.
 
 
 
