@@ -52,8 +52,12 @@ afterAll(() => {
 });
 
 describe('M0 gate', () => {
+  // Listing spawns a `vitest` process and loads the project config, so the default 5 s timeout makes
+  // this a machine-speed measurement rather than an assertion about the config. It passed locally at
+  // ~3.6 s and timed out on the CI runner.
   it.each(['unit', 'contracts', 'integration'])(
     'the %s project runs at least one test file',
+    { timeout: 60_000 },
     (project) => {
       // `vitest list --json` reports what would run; an exit code cannot, because
       // passWithNoTests makes an empty run succeed.
