@@ -1,0 +1,85 @@
+{
+  "$comment": "Golden vectors for deriveProviderIdempotencyKey (P01-T13). Hashed digests verified independently of the implementation with Python hashlib + base64.b32encode.",
+  "version": 1,
+  "vectors": [
+    {
+      "id": "plain-docs-example",
+      "inputs": {
+        "environment": "test",
+        "provider": "fake-provider",
+        "operationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "maxKeyLength": 255
+      },
+      "expected": {
+        "key": "flowledger:test:fake-provider:op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "form": "PLAIN"
+      }
+    },
+    {
+      "id": "plain-boundary",
+      "inputs": {
+        "environment": "test",
+        "provider": "fake-provider",
+        "operationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "maxKeyLength": 59
+      },
+      "expected": {
+        "key": "flowledger:test:fake-provider:op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "form": "PLAIN"
+      }
+    },
+    {
+      "id": "hashed-boundary",
+      "inputs": {
+        "environment": "test",
+        "provider": "fake-provider",
+        "operationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "maxKeyLength": 58
+      },
+      "expected": {
+        "key": "fl:v1:wdvfqkxvjpsybp7mdoamfihok3t4yc5eyhcem2juu72ibpqwhwha",
+        "form": "HASHED_V1",
+        "sha256Hex": "b0ea582af54be580bfec1b80c2a0ee56e7cc0ba4c1c4466934a7f480be163d8e"
+      }
+    },
+    {
+      "id": "plain-unreliable",
+      "inputs": {
+        "environment": "sandbox",
+        "provider": "unreliable-provider",
+        "operationId": "op_7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "maxKeyLength": 255
+      },
+      "expected": {
+        "key": "flowledger:sandbox:unreliable-provider:op_7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "form": "PLAIN"
+      }
+    },
+    {
+      "id": "hashed-unreliable",
+      "inputs": {
+        "environment": "sandbox",
+        "provider": "unreliable-provider",
+        "operationId": "op_7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "maxKeyLength": 64
+      },
+      "expected": {
+        "key": "fl:v1:wniil6l4sg4ccn5yzfswi6cmhaglmy5r236kuuws65gh5d3j4ozq",
+        "form": "HASHED_V1",
+        "sha256Hex": "b35085f97c91b82137b8c96564784c380cb663b1d6fcaa52d2f74c7e8f69e3b3"
+      }
+    },
+    {
+      "id": "limit-too-small",
+      "inputs": {
+        "environment": "test",
+        "provider": "fake-provider",
+        "operationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "maxKeyLength": 57
+      },
+      "expected": {
+        "error": "PROVIDER_KEY_LIMIT_TOO_SMALL"
+      }
+    }
+  ]
+}

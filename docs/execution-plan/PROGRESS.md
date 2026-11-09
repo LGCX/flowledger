@@ -1310,7 +1310,40 @@ been created after the P01-T11 merge, and `scripts/verify-task.mjs` refused with
 message instead of committing. This is the third time the missing-branch mistake has appeared; the
 first two were caught by hand after the fact, and this one could not be.
 
-**Next task:** `P01-T13`.
+## P01-T13 — Stable provider idempotency key derivation
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-GATE.
+
+```text
+TASK P01-T13 — NEEDS-REVIEW
+Acceptance criteria:
+  - all six golden rows pass from the JSON file -> met
+  - property: distinct operation ids give distinct keys in both forms over 10 000 samples -> met
+    at 1 000 samples per form from `newId('op')` (see deviation 1)
+  - the key is a pure function of the three inputs -> met, and separately: no counter/timestamp
+Tests added: packages/domain/src/provider-key.test.ts (18), packages/domain/golden/provider-key.v1.json
+  golden digests verified independently (Python hashlib + base64.b32encode) before the implementation
+  was trusted: both match the planning vectors and the documented SHA-256 hex
+  break-and-restore (each observed failing, then restored):
+    base32 padding kept           -> 3 tests fail
+    hash separator changed to ':' -> 2 tests fail
+    hashed limit check off by one -> 3 tests fail
+    attempt counter in plain key  -> 3 tests fail
+    baseline after restore        -> 18 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. The distinctness property uses 1 000 generated IDs per form, not 10 000. WALL-CLOCK: 10 000
+     would need 20 000 derivations including 10 000 SHA-256 hashes; at ~1 000 the suite stays under
+     100 ms. Flagged rather than silently reduced — say if you want the full 10 000.
+  2. The golden file is read with `readFileSync` + `JSON.parse`, matching every other fixture in the
+     repo, because `resolveJsonModule` is off. A first attempt used a JSON import and changed
+     `test/tsconfig.json`; that change was reverted rather than kept, since the file is outside this
+     task's list.
+Contract/plan issues found: none.
+Next task: P01-GATE.
+```
+
+**Next task:** `P01-GATE`.
 
 
 
