@@ -1203,7 +1203,49 @@ Next task: P01-T10.
 one meant a test was missing or too coarse — not that the code was fine. A break that does not bite is
 a bug report about the test suite.
 
-**Next task:** `P01-T10`.
+## P01-T10 — Model-based lifecycle property tests
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T11.
+
+```text
+TASK P01-T10 — NEEDS-REVIEW
+Acceptance criteria:
+  - random model sequence asserts every invariant, version delta, and fee property after EVERY step
+    -> met
+  - injected bug 1 (refund does not release its reservation) makes the suite fail -> met, 2 tests
+  - injected bug 2 (markUnknown does not bump the payment version) -> met, 1 test
+  - injected bug 3 (refund guard `>=`) -> met, 2 tests
+  - each reverted and the suite green; seeds/paths recorded below
+  - deterministic given FC_SEED; failing cases persisted -> met, FC_SEED=20261108 for the runs below
+Tests added: packages/domain/src/lifecycle.property.test.ts (8), 96ms for the whole file
+Seeds observed in reports/property-failures.jsonl during the injections: 20261108, e.g.
+  bug 2 path "61:0:0:2:3:5:6:5:4:4"
+  bug 3 path "101:8", counterexample [6n,[2n,9n,1n]]
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text: none.
+Contract/plan issues found: none.
+Next task: P01-T11.
+```
+
+**Four defects in these properties, found by running them rather than reading them:**
+
+1. **The random walk almost never reaches a successful refund resolution** (it needs accept → claim →
+   resolve to line up). Bug 1 was therefore invisible to it, and the suite reported 8/8 green with the
+   reservation bug in place. The invariant is now asserted inside the ordered-refund property, which
+   reaches the path deterministically, plus a dedicated targeted case.
+2. **The two-orders property was silently vacuous.** It resolved operations that had never been
+   claimed, `resolveOperation` correctly rejected them, and the helper returned a short list that
+   nothing checked. It now claims first and asserts the list length.
+3. **A fixture violated `CAPTURE_RELEASES_REMAINDER`** — `authorized 1000000` with `captured 3` and no
+   void. Fixed by voiding the difference; the invariant is what caught it.
+4. **The `captured()` helper hard-coded a fee of 30**, which is inconsistent with a gross of 3 and made
+   the fee functions reject their own snapshot. The fee is now computed from the policy.
+
+**Open item for a separate commit:** `packages/testkit/src/fast-check-setup.ts` reports only
+seed/path/counterexample and discards `details.errorInstance`, so a property failure prints no cause.
+Finding defects 1–3 above required temporarily patching the reporter.
+
+**Next task:** `P01-T11`.
 
 
 
