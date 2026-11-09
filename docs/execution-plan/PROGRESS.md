@@ -1689,7 +1689,54 @@ the constraint it targets is subsumed.
 Next task: P02-T08.
 ```
 
-**Next task:** `P02-T08`.
+## P02-T08 — Migration 0240: payment aggregate table
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T09.
+
+```text
+TASK P02-T08 — NEEDS-REVIEW
+Acceptance criteria:
+  - every named constraint has a negative test -> met (29 constraints + the reference key)
+  - provider account/version, ciphertext, currency, requested amount and fee policy immutable -> met,
+    enforced by the guard for the table owner too
+  - provider references append-once; version increases by exactly 1 -> met
+  - a payment cannot reference another merchant's account, fee policy, or credential -> met on INSERT
+  - no runtime role can insert/update/delete/truncate; fl_api cannot read the ciphertext -> met
+Tests added: test/integration/db/payments.test.ts (26), packages/testkit/src/fixtures/payments.ts
+  break-and-restore (each observed failing, then restored) — all six bit:
+    refund_reservation_bound relaxed        -> the boundary case fails
+    exclusive_excludes_refunds relaxed      -> that case fails
+    capture_releases_remainder relaxed      -> that case fails
+    provider_account_version out of the immutability list -> 2 cases fail
+    version-increment check removed         -> that case fails
+    ciphertext granted to fl_api            -> 2 cases fail
+    baseline after restore                  -> 26 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 215, e2e 0
+Deviations from the task text:
+  1. The cross-tenant FK cases are exercised on INSERT, not UPDATE. On UPDATE the immutability guard
+     rejects a changed binding first, so the foreign keys are only reachable when a row is created
+     pointing at the wrong tenant — which is also the case that matters.
+  2. `assertConstraintCoverage` lists constraints and *unique* indexes only, so the two plain indexes
+     (`payments_active_exclusive`, `payments_unresolved_refunds`) are not declared there.
+  3. Two earlier tests changed: TRUNCATE on `identity.merchants`, `identity.merchant_api_credentials`
+     and `payments.fee_policies` is now refused by PostgreSQL itself (0A000, table referenced by a
+     foreign key) before the guard trigger runs. The assertions were updated to the refusal that
+     actually applies, which is the stronger one; the DELETE cases still prove the trigger.
+Contract/plan issues found: none.
+Next task: P02-T09.
+```
+
+**Five defects found in my own test code**, each of which had produced a false pass or a misleading error:
+1. The `newPayment` helper applied overrides only when more than one key was present, so every
+   single-column negative case silently tested an unchanged row.
+2. The helper left an aborted transaction open on failure, poisoning the pooled connection — the *next*
+   test then failed with "current transaction is aborted" for an unrelated reason.
+3. The `it.each` binding table was evaluated at collection time, before the second merchant existed.
+4. Two immutability cases set a column to `null` when it was already `null`, so nothing changed.
+5. The tenant-visibility test created both payments for the same merchant and then asserted one of them
+   was invisible.
+
+**Next task:** `P02-T09`.
 
 
 

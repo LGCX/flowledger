@@ -352,16 +352,26 @@ describe('guards', () => {
     expect(deleted.error?.code).toBe('IMMUTABLE_ROW');
     expect(deleted.error?.detail).toMatchObject({ operation: 'DELETE' });
 
+    // Both identity tables are now referenced by `payments.payments`, so PostgreSQL refuses the
+    // truncate itself (0A000) before the guard trigger fires. The DELETE cases above still prove the
+    // trigger; this proves the stronger, earlier refusal.
     const truncated = (await runMapped('TRUNCATE identity.merchant_api_credentials')) as {
-      error?: DomainError;
+      error?: { code?: string };
     };
-    expect(truncated.error?.code).toBe('IMMUTABLE_ROW');
-    expect(truncated.error?.detail).toMatchObject({ operation: 'TRUNCATE' });
+    expect(truncated.error?.code).toBe('0A000');
 
     const merchantDeleted = (await runMapped('DELETE FROM identity.merchants WHERE id = $1', [
       MERCHANT_B,
     ])) as { error?: DomainError };
     expect(merchantDeleted.error?.code).toBe('IMMUTABLE_ROW');
+
+    // Truncating `merchants` is refused even earlier now that `payments.payments` references it:
+    // PostgreSQL will not truncate a table referenced by a foreign key (0A000). Both refusals are
+    // correct, and this asserts the one that actually applies.
+    const merchantTruncated = (await runMapped('TRUNCATE identity.merchants')) as {
+      error?: { code?: string };
+    };
+    expect(merchantTruncated.error?.code).toBe('0A000');
   });
 
   it('refuses to change a merchant display name, currency, or creation time', async () => {

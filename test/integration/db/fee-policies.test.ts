@@ -345,10 +345,10 @@ describe('immutability', () => {
     const deleted = await runMapped('DELETE FROM payments.fee_policies WHERE id = $1', [id]);
     expect(((deleted as { error?: DomainError }).error as DomainError).code).toBe('IMMUTABLE_ROW');
 
+    // `payments.payments` references this table, so PostgreSQL refuses the truncate outright (0A000)
+    // before the guard trigger is reached. A stronger refusal than the trigger's own.
     const truncated = await runMapped('TRUNCATE payments.fee_policies');
-    expect(((truncated as { error?: DomainError }).error as DomainError).code).toBe(
-      'IMMUTABLE_ROW',
-    );
+    expect((truncated as { error?: { code?: string } }).error?.code).toBe('0A000');
   });
 });
 
