@@ -1,0 +1,42 @@
+# Pinned versions
+
+Every runtime and development dependency is pinned to an exact version. `pnpm-lock.yaml` is
+committed. This file is updated **in the same commit as any version bump** (CONVENTIONS §2, §13).
+
+## Toolchain
+
+| Tool           | Pinned version | Where pinned                                                       |
+| -------------- | -------------- | ------------------------------------------------------------------ |
+| Node.js        | 24.22.1        | `.nvmrc`, `package.json#engines.node`                              |
+| pnpm           | 10.34.9        | `package.json#packageManager` (Corepack)                           |
+| PostgreSQL     | 17             | Docker image tag, `infra/docker/compose.yaml` (created by P00-T06) |
+| Docker Engine  | 24.0 minimum   | host requirement                                                   |
+| Docker Compose | v2.20+         | host requirement                                                   |
+| Terraform      | 1.9+           | first used in P13                                                  |
+| k6             | 0.5x+          | first used in P12                                                  |
+
+Node.js is the newest 24.x patch that had been released for at least 14 days when this task ran
+(24.22.1, released 2026-10-20). `engine-strict=true` in `.npmrc` makes a mismatched Node or pnpm
+version a hard install failure rather than a warning.
+
+## devDependencies
+
+| Package             | Pinned version | Purpose                                    |
+| ------------------- | -------------- | ------------------------------------------ |
+| `typescript`        | 5.9.3          | compiler                                   |
+| `@types/node`       | 24.19.2        | Node.js typings for the pinned Node 24     |
+| `vitest`            | 4.1.12         | test runner; `test.projects` needs >= 3.2  |
+| `eslint`            | 9.39.5         | linter (flat config)                       |
+| `@eslint/js`        | 9.39.5         | ESLint core `recommended` config           |
+| `typescript-eslint` | 8.72.1         | TypeScript parser and `recommended` config |
+| `prettier`          | 3.9.10         | formatter                                  |
+
+`typescript`, `@types/node`, and `@eslint/js` are not on the CONVENTIONS §2 approved-dependency
+list. They are justified in the P00-T01 commit body: no approved package provides the compiler,
+the Node typings, or ESLint's own recommended config, and `typescript-eslint` peer-depends on the
+first two.
+
+## Runtime dependencies
+
+None yet. Later tasks add runtime dependencies from the CONVENTIONS §2 approved list, pinned
+exactly, recorded here in the same commit.

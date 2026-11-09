@@ -1,0 +1,12 @@
+{
+  "name": "@flowledger/testkit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@flowledger/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+pnpm-lock.yaml
+**/dist
+reports
+coverage
+docs/0*.md
+docs/10-IMPLEMENTATION_PLAN.md
+docs/adr
+docs/execution-plan
+openapi/openapi.yaml
+schemas
+README.md
+.pnpm-store
+.reasonix
