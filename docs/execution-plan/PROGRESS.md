@@ -1375,7 +1375,56 @@ unless told not to. The code was right (`toTimestamp` throws on an Invalid Date 
 not client input) and the generator was wrong. Fixed test-only in `a456324`, merged before this gate,
 with P01-T03 recorded as reopened.
 
-**Next task:** `P02-T01`.
+## P02-T01 — Migration runner, pool, bootstrap, `flowledger migrate`, Testcontainers fixture
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T02.
+
+```text
+TASK P02-T01 — NEEDS-REVIEW
+Acceptance criteria:
+  - files applied in lexical order, one transaction each, recording (filename, sha256, applied_at) -> met
+  - checksum change / missing applied file / out-of-order / bad filename each fail BEFORE any apply -> met
+  - ledger GUCs visible inside each file and equal LEDGER_BUCKET_COUNT -> met
+  - two concurrent runs apply each file exactly once (advisory lock) -> met
+  - bootstrapDatabase idempotent -> met
+  - useTestDatabase() yields every migration; dropped after the file -> met structurally; the
+    "every migration" half is vacuous until P02-T03 adds the first file (noted, not claimed)
+  - no migration library / ORM / query builder; only pg and @testcontainers/postgresql -> met
+Tests added: test/integration/db/migrate-runner.test.ts (20)
+  break-and-restore (each observed failing, then restored):
+    owner guard removed              -> NOT_MIGRATION_OWNER case fails
+    checksum comparison removed      -> CHECKSUM_MISMATCH case fails
+    missing-file check removed       -> APPLIED_FILE_MISSING case fails
+    out-of-order check removed       -> OUT_OF_ORDER case fails
+    filename pattern removed         -> all four INVALID_FILENAME cases fail
+    no BEGIN/COMMIT around a file    -> the GUC case fails (set_config is_local becomes a no-op)
+    advisory lock removed            -> the concurrency case fails
+    ROLLBACK -> COMMIT on failure    -> DID NOT FAIL, and correctly: PostgreSQL refuses to commit an
+                                        aborted transaction, so the database enforces the rollback
+                                        regardless of the client. Recorded rather than papered over.
+  baseline after restore -> 20 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. Test files reach the container through `setTestConnection(inject('flowledgerPg'))` in a
+     `beforeAll`, and `packages/testkit/src/pg.ts` augments Vitest's `ProvidedContext`. The task shows
+     `provide`/`inject` but not how the fixture learns the connection; module state cannot be shared
+     from globalSetup to a worker, so the augmentation is what makes `inject` typed.
+  2. `apps/cli/src/main.test.ts` was modified (not in the Files list): a P00-T05 case asserted
+     `migrate` returns 2 "not implemented until P02". Implementing the command necessarily invalidates
+     it; it now asserts a configuration failure (exit 1 naming MIGRATION_DATABASE_URL) instead.
+  3. `disposeTestDatabase` was added so a file can drop its clone; the listed interface cannot end the
+     pools it hands out otherwise.
+Contract/plan issues found: none.
+Next task: P02-T02.
+```
+
+**A test bug worth recording.** The first version of the bootstrap idempotency test passed
+`TEST_ROLE_PASSWORD` in the migration URL, and `bootstrapDatabase` sets the role's password from that
+URL — so it silently rotated `fl_migration_owner` and the next two tests failed to authenticate. The
+fixture uses one container per run, which makes roles genuinely shared state; tests that touch them must
+use the fixture's own password. That is a real hazard for every later DB test, not a one-off.
+
+**Next task:** `P02-T02`.
 
 
 

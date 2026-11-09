@@ -39,11 +39,19 @@ describe('runCli', () => {
     expect(test.err).toEqual([]);
   });
 
-  it('migrate returns 2 and names P02', async () => {
+  it('migrate is implemented and reports missing configuration instead of "not implemented"', async () => {
+    // P02-T01 implemented `migrate`; with no MIGRATION_DATABASE_URL it must fail configuration
+    // validation and say so, rather than claim the command does not exist.
     const test = capture();
-    expect(await runCli(['migrate'], test.io)).toBe(2);
-    expect(test.err).toEqual(['flowledger migrate: not implemented until P02']);
-    expect(test.out).toEqual([]);
+    const previous = process.env.MIGRATION_DATABASE_URL;
+    delete process.env.MIGRATION_DATABASE_URL;
+    try {
+      expect(await runCli(['migrate'], test.io)).toBe(1);
+    } finally {
+      if (previous !== undefined) process.env.MIGRATION_DATABASE_URL = previous;
+    }
+    expect(test.out.join('\n')).toContain('MIGRATION_DATABASE_URL');
+    expect(test.out.join('\n')).not.toContain('not implemented');
   });
 
   it('seed returns 2 and names P02', async () => {

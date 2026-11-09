@@ -29,6 +29,9 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['test/integration/**/*.test.ts'],
+          // One PostgreSQL container per run, with a migrated `fl_template` cloned per test file
+          // (packages/testkit/src/pg-global-setup.ts).
+          globalSetup: ['packages/testkit/src/pg-global-setup.ts'],
           testTimeout: 120_000,
           hookTimeout: 120_000,
         },
@@ -38,6 +41,7 @@ export default defineConfig({
         test: {
           name: 'e2e',
           include: ['test/e2e/**/*.test.ts'],
+          globalSetup: ['packages/testkit/src/pg-global-setup.ts'],
           testTimeout: 300_000,
           hookTimeout: 300_000,
         },
@@ -47,6 +51,7 @@ export default defineConfig({
         test: {
           name: 'chaos',
           include: ['test/chaos/**/*.test.ts'],
+          globalSetup: ['packages/testkit/src/pg-global-setup.ts'],
           testTimeout: 300_000,
           hookTimeout: 300_000,
         },

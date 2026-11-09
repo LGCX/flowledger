@@ -131,6 +131,12 @@ importers:
       '@flowledger/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@flowledger/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
 
   apps/merchant-webhook-dispatcher:
     dependencies:
@@ -296,7 +302,27 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.20.0)
 
-  packages/database: {}
+  packages/database:
+    dependencies:
+      '@flowledger/config':
+        specifier: workspace:*
+        version: link:../config
+      '@flowledger/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@flowledger/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@flowledger/observability':
+        specifier: workspace:*
+        version: link:../observability
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
 
   packages/domain:
     dependencies:
@@ -316,6 +342,9 @@ importers:
 
   packages/testkit:
     dependencies:
+      '@flowledger/database':
+        specifier: workspace:*
+        version: link:../database
       '@testcontainers/postgresql':
         specifier: 12.2.1
         version: 12.2.1(bare-buffer@3.7.1)

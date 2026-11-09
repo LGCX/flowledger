@@ -6,6 +6,8 @@
  * favour the standard library over a dependency.
  */
 
+import { migrateCommand } from './commands/migrate.js';
+
 export interface CliIo {
   out(line: string): void;
   err(line: string): void;
@@ -35,8 +37,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
 
   switch (command) {
     case 'migrate':
-      io.err('flowledger migrate: not implemented until P02');
-      return NOT_IMPLEMENTED;
+      return migrateCommand(argv.slice(1), process.env, io.out);
     case 'seed':
       io.err('flowledger seed: not implemented until P02');
       return NOT_IMPLEMENTED;

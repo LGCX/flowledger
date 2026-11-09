@@ -8,5 +8,15 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "@flowledger/config": "workspace:*",
+    "@flowledger/contracts": "workspace:*",
+    "@flowledger/domain": "workspace:*",
+    "@flowledger/observability": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
   }
 }
