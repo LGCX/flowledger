@@ -1450,7 +1450,46 @@ Contract/plan issues found: none.
 Next task: P02-T03.
 ```
 
-**Next task:** `P02-T03`.
+## P02-T03 — Migration 0200: schemas, roles, common helpers
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T04.
+
+```text
+TASK P02-T03 — NEEDS-REVIEW
+Acceptance criteria:
+  - all 19 roles exist; owners NOLOGIN, runtime LOGIN; none SUPERUSER/CREATEROLE/CREATEDB/BYPASSRLS -> met
+  - migration owner is a member of every function-owner role with SET TRUE, INHERIT FALSE -> met
+  - all 10 schemas exist owned by the migration owner; PUBLIC has neither USAGE nor CREATE -> met
+  - re-applying 0200 to a second database in the same cluster succeeds -> met
+  - a function created after 0200 is not executable by PUBLIC -> met (default privileges)
+Tests added: test/integration/db/foundation.test.ts (33), packages/testkit/src/constraints.ts
+  break-and-restore (each observed failing, then restored):
+    default-privileges revoke removed -> the "not executable by PUBLIC" case fails
+    function owners created LOGIN    -> the role-attribute case fails
+    fl_is_id leading anchor removed  -> the new "leading junk" case fails
+    fl_assert_unchanged sorts columns -> the declaration-order case fails
+  Two breaks did NOT bite, and both are findings rather than passes:
+    1. Removing `REVOKE ALL ON SCHEMA ... FROM PUBLIC` changed nothing: PostgreSQL grants nothing to
+       PUBLIC on a newly created schema, so the statement is defensive documentation, not a guard.
+       Kept, and recorded as such rather than counted as evidence.
+    2. My first "column order" break was an identical no-op replacement (the anchor and the
+       replacement were the same text) — a self-inflicted invalid break, redone as a sort.
+  Also added two fl_is_id cases (leading junk, trailing newline) because no existing case
+  distinguished the anchored pattern from an unanchored one.
+  baseline after restore -> 33 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `fl_raise_domain` is granted to the eleven runtime roles in addition to the seven function-owner
+     roles. Trigger functions fire as the mutating role, and a non-SECURITY-DEFINER trigger that calls
+     `fl_raise_domain` would otherwise fail with "permission denied" instead of raising the intended
+     domain error.
+  2. `fl_assign_function_owner` is not SECURITY DEFINER: the migration owner already holds SET on the
+     owner roles, so definer rights would add an escalation surface for nothing.
+Contract/plan issues found: none.
+Next task: P02-T04.
+```
+
+**Next task:** `P02-T04`.
 
 
 
