@@ -191,6 +191,70 @@ export async function fixtureUpdateOperation(
 }
 
 /**
+ * Recomputes a payment's aggregate fields from its operation rows.
+ *
+ * Since migration 0260 the deferred trigger requires the two to agree at commit, so any fixture that
+ * inserts an operation must update the payment in the same transaction. Deriving the fields from the
+ * rows keeps every fixture consistent by construction rather than by hand-arithmetic.
+ */
+export async function fixtureSyncPayment(client: pg.ClientBase, paymentId: string): Promise<void> {
+  await client.query(
+    `UPDATE payments.payments p SET
+       active_exclusive_operation_id = (
+         SELECT o.id FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type IN ('AUTHORIZE', 'CAPTURE', 'CANCEL')
+            AND o.status IN ('REQUESTED', 'PROCESSING', 'UNKNOWN', 'REQUIRES_REVIEW')
+       ),
+       reserved_refund_amount_minor = (
+         SELECT coalesce(sum(o.amount_minor), 0) FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type = 'REFUND'
+            AND o.status IN ('REQUESTED', 'PROCESSING', 'UNKNOWN', 'REQUIRES_REVIEW')
+       ),
+       unresolved_refund_count = (
+         SELECT count(*) FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type = 'REFUND'
+            AND o.status IN ('REQUESTED', 'PROCESSING', 'UNKNOWN', 'REQUIRES_REVIEW')
+       ),
+       captured_amount_minor = (
+         SELECT coalesce(max(o.amount_minor), 0) FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type = 'CAPTURE' AND o.status = 'SUCCEEDED'
+       ),
+       refunded_amount_minor = (
+         SELECT coalesce(sum(o.amount_minor), 0) FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type = 'REFUND' AND o.status = 'SUCCEEDED'
+       ),
+       authorized_amount_minor = coalesce((
+         SELECT max(o.amount_minor) FROM payments.payment_operations o
+          WHERE o.payment_id = p.id AND o.type = 'AUTHORIZE' AND o.status = 'SUCCEEDED'
+       ), 0),
+       voided_amount_minor = CASE
+         WHEN EXISTS (
+           SELECT 1 FROM payments.payment_operations o
+            WHERE o.payment_id = p.id AND o.type = 'CANCEL' AND o.status = 'SUCCEEDED'
+         ) THEN coalesce((
+           SELECT max(o.amount_minor) FROM payments.payment_operations o
+            WHERE o.payment_id = p.id AND o.type = 'AUTHORIZE' AND o.status = 'SUCCEEDED'
+         ), 0)
+         ELSE p.voided_amount_minor
+       END,
+       authorization_outcome = CASE
+         WHEN EXISTS (
+           SELECT 1 FROM payments.payment_operations o
+            WHERE o.payment_id = p.id AND o.type = 'CANCEL' AND o.status = 'SUCCEEDED'
+         ) THEN 'CANCELED'
+         WHEN EXISTS (
+           SELECT 1 FROM payments.payment_operations o
+            WHERE o.payment_id = p.id AND o.type = 'AUTHORIZE' AND o.status = 'SUCCEEDED'
+         ) THEN 'AUTHORIZED'
+         ELSE 'NOT_REQUESTED'
+       END,
+       version = p.version + 1
+     WHERE p.id = $1`,
+    [paymentId],
+  );
+}
+
+/**
  * A payment with a succeeded AUTHORIZE and a succeeded CAPTURE, in an internally consistent state:
  * `authorized = captured = amountMinor`, capture released no remainder, and the pointer cleared.
  */
@@ -213,11 +277,13 @@ export async function fixtureCapturedPayment(
     status: 'SUCCEEDED',
   });
 
+  // A capture releases the remainder, so the payment must also record it before the aggregates sync.
   await fixtureUpdatePayment(client, paymentId, {
     authorized_amount_minor: amountMinor,
     captured_amount_minor: amountMinor,
     authorization_outcome: 'AUTHORIZED',
   });
+  await fixtureSyncPayment(client, paymentId);
 
   return { paymentId, authorizeId, captureId };
 }

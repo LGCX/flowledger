@@ -11,6 +11,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
 
+import pg from 'pg';
+
 import { DomainError, LOGIN_RUNTIME_ROLES, withTransaction } from '@flowledger/database';
 import { newId } from '@flowledger/domain';
 import {
@@ -20,7 +22,7 @@ import {
   fixtureCapturedPayment,
   fixtureInsertOperation,
   fixtureInsertPayment,
-  fixtureUpdatePayment,
+  fixtureSyncPayment,
   setTestConnection,
   useTestDatabase,
   type TestDatabase,
@@ -57,10 +59,32 @@ async function runMapped(
   }
 }
 
-/** A fresh AUTHORIZED payment with a succeeded authorization, for operation tests to build on. */
-async function authorizedPayment(amountMinor = 10_000n): Promise<{ paymentId: string }> {
+/**
+ * Recomputes the payment's aggregate fields from its operation rows.
+ *
+ * Since 0260 the deferred trigger requires the two to agree at commit, so a fixture that inserts an
+ * operation must also update the payment in the same transaction. Deriving the fields from the rows
+ * rather than hand-computing them keeps every fixture consistent by construction.
+ */
+/** Runs `fn` in one transaction, so deferred consistency sees a settled end state. */
+async function inTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await database.ownerPool.connect();
   try {
+    await client.query('BEGIN');
+    const value = await fn(client);
+    await client.query('COMMIT');
+    return value;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/** A fresh AUTHORIZED payment with a succeeded authorization, for operation tests to build on. */
+async function authorizedPayment(amountMinor = 10_000n): Promise<{ paymentId: string }> {
+  return inTransaction(async (client) => {
     const paymentId = await fixtureInsertPayment(client, merchant, {
       requestedAmountMinor: amountMinor,
     });
@@ -69,26 +93,20 @@ async function authorizedPayment(amountMinor = 10_000n): Promise<{ paymentId: st
       amountMinor,
       status: 'SUCCEEDED',
     });
-    await fixtureUpdatePayment(client, paymentId, {
-      authorized_amount_minor: amountMinor,
-      authorization_outcome: 'AUTHORIZED',
-    });
+    await fixtureSyncPayment(client, paymentId);
     return { paymentId };
-  } finally {
-    client.release();
-  }
+  });
 }
 
 async function insertOperation(
   paymentId: string,
   operation: Parameters<typeof fixtureInsertOperation>[3],
 ): Promise<string> {
-  const client = await database.ownerPool.connect();
-  try {
-    return await fixtureInsertOperation(client, merchant, paymentId, operation);
-  } finally {
-    client.release();
-  }
+  return inTransaction(async (client) => {
+    const id = await fixtureInsertOperation(client, merchant, paymentId, operation);
+    await fixtureSyncPayment(client, paymentId);
+    return id;
+  });
 }
 
 describe('constraint coverage', () => {
@@ -199,18 +217,23 @@ describe('fee-effect rules', () => {
   it('rejects a REFUND with a fee while REQUESTED, and a SUCCEEDED REFUND without one', async () => {
     const client = await database.ownerPool.connect();
     try {
+      await client.query('BEGIN');
       const { paymentId, captureId } = await fixtureCapturedPayment(client, merchant, 10_000n);
+      await client.query('COMMIT');
 
+      await client.query('BEGIN');
       const inFlight = await fixtureInsertOperation(client, merchant, paymentId, {
         type: 'REFUND',
         amountMinor: 1_000n,
         captureOperationId: captureId,
         feeEffectAmountMinor: 0n,
       }).catch((caught: unknown) => caught);
+      await client.query('ROLLBACK');
       expect((inFlight as { constraint?: string }).constraint).toBe(
         'payment_operations_fee_effect',
       );
 
+      await client.query('BEGIN');
       const missingFee = await fixtureInsertOperation(client, merchant, paymentId, {
         type: 'REFUND',
         amountMinor: 1_000n,
@@ -218,6 +241,7 @@ describe('fee-effect rules', () => {
         captureOperationId: captureId,
         feeEffectAmountMinor: null,
       }).catch((caught: unknown) => caught);
+      await client.query('ROLLBACK');
       expect((missingFee as { constraint?: string }).constraint).toBe(
         'payment_operations_fee_effect',
       );
@@ -303,20 +327,28 @@ describe('link and resolution rules', () => {
   });
 
   it('rejects a capture link to another payment’s operation', async () => {
-    const first = await authorizedPayment();
-    const second = await authorizedPayment();
-    const foreignCapture = await insertOperation(first.paymentId, {
-      type: 'CAPTURE',
-      amountMinor: 100n,
-      status: 'SUCCEEDED',
-    });
+    const first = await authorizedPayment(10_000n);
+    const second = await authorizedPayment(10_000n);
 
-    const error = await insertOperation(second.paymentId, {
-      type: 'REFUND',
-      amountMinor: 100n,
-      captureOperationId: foreignCapture,
-    }).catch((caught: unknown) => caught);
-    expect((error as { constraint?: string }).constraint).toBe('payment_operations_capture_fkey');
+    const client = await database.ownerPool.connect();
+    try {
+      await client.query('BEGIN');
+      const foreignCapture = await fixtureInsertOperation(client, merchant, first.paymentId, {
+        type: 'CAPTURE',
+        amountMinor: 10_000n,
+        status: 'SUCCEEDED',
+      });
+      const error = await fixtureInsertOperation(client, merchant, second.paymentId, {
+        type: 'REFUND',
+        amountMinor: 100n,
+        captureOperationId: foreignCapture,
+      }).catch((caught: unknown) => caught);
+      await client.query('ROLLBACK');
+
+      expect((error as { constraint?: string }).constraint).toBe('payment_operations_capture_fkey');
+    } finally {
+      client.release();
+    }
   });
 
   it('rejects a duplicate provider idempotency key for one account', async () => {
@@ -368,11 +400,13 @@ describe('exclusion indexes', () => {
   it('allows three unresolved refunds on one payment', async () => {
     const client = await database.ownerPool.connect();
     try {
+      await client.query('BEGIN');
       const { paymentId, captureId } = await fixtureCapturedPayment(client, merchant, 10_000n);
+      await client.query('COMMIT');
 
       for (const amount of [1_000n, 2_000n, 3_000n]) {
         await expect(
-          fixtureInsertOperation(client, merchant, paymentId, {
+          insertOperation(paymentId, {
             type: 'REFUND',
             amountMinor: amount,
             captureOperationId: captureId,
@@ -394,10 +428,12 @@ describe('exclusion indexes', () => {
   it('allows two succeeded refunds on one payment', async () => {
     const client = await database.ownerPool.connect();
     try {
+      await client.query('BEGIN');
       const { paymentId, captureId } = await fixtureCapturedPayment(client, merchant, 10_000n);
+      await client.query('COMMIT');
       for (const amount of [1_000n, 2_000n]) {
         await expect(
-          fixtureInsertOperation(client, merchant, paymentId, {
+          insertOperation(paymentId, {
             type: 'REFUND',
             amountMinor: amount,
             status: 'SUCCEEDED',
@@ -441,23 +477,34 @@ describe('exclusion indexes', () => {
   it.each<['AUTHORIZE' | 'CAPTURE' | 'CANCEL']>([['AUTHORIZE'], ['CAPTURE'], ['CANCEL']])(
     'refuses a second succeeded %s',
     async (type) => {
-      // A bare payment: `authorizedPayment()` already holds a succeeded AUTHORIZE.
+      // Rolled back at the end, so the aggregate trigger never runs: this case is about the partial
+      // unique index, which fires at statement time.
       const client = await database.ownerPool.connect();
-      const paymentId = await fixtureInsertPayment(client, merchant, {
-        requestedAmountMinor: 10_000n,
-      });
-      client.release();
-      await insertOperation(paymentId, { type, amountMinor: 100n, status: 'SUCCEEDED' });
-      const error = await insertOperation(paymentId, {
-        type,
-        amountMinor: 100n,
-        status: 'SUCCEEDED',
-      }).catch((caught: unknown) => caught);
-      expect([
-        'payment_operations_one_successful_authorization',
-        'payment_operations_one_successful_capture',
-        'payment_operations_one_successful_cancel',
-      ]).toContain((error as { constraint?: string }).constraint);
+      try {
+        await client.query('BEGIN');
+        const paymentId = await fixtureInsertPayment(client, merchant, {
+          requestedAmountMinor: 10_000n,
+        });
+        await fixtureInsertOperation(client, merchant, paymentId, {
+          type,
+          amountMinor: 10_000n,
+          status: 'SUCCEEDED',
+        });
+        const error = await fixtureInsertOperation(client, merchant, paymentId, {
+          type,
+          amountMinor: 10_000n,
+          status: 'SUCCEEDED',
+        }).catch((caught: unknown) => caught);
+
+        expect([
+          'payment_operations_one_successful_authorization',
+          'payment_operations_one_successful_capture',
+          'payment_operations_one_successful_cancel',
+        ]).toContain((error as { constraint?: string }).constraint);
+        await client.query('ROLLBACK');
+      } finally {
+        client.release();
+      }
     },
   );
 });

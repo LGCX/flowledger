@@ -13,6 +13,7 @@ import {
   assertConstraintCoverage,
   createTestMerchant,
   disposeTestDatabase,
+  fixtureInsertOperation,
   fixtureInsertPayment,
   fixtureUpdatePayment,
   setTestConnection,
@@ -136,25 +137,40 @@ describe('monetary checks', () => {
     await expect(newPayment({ requestedAmountMinor: 1_000_000_000_000n })).resolves.toBeTruthy();
   });
 
-  it('accepts refunded + reserved equal to captured and rejects one more', async () => {
-    const id = await newPayment({
-      authorized_amount_minor: 10_000n,
-      captured_amount_minor: 10_000n,
-      refunded_amount_minor: 6_000n,
-      reserved_refund_amount_minor: 4_000n,
-      unresolved_refund_count: 1,
-      authorization_outcome: 'AUTHORIZED',
-    });
-
+  /**
+   * The reservation CHECK is asserted inside a rolled-back transaction: since migration 0260 a payment
+   * cannot commit a reservation that no refund operations back, so the consistent *positive* case now
+   * lives in `payment-consistency.test.ts`, where the operations exist.
+   */
+  it('rejects refunded + reserved exceeding captured', async () => {
     const client = await database.ownerPool.connect();
     try {
       await client.query('BEGIN');
+      const id = await fixtureInsertPayment(client, merchant, { requestedAmountMinor: 10_000n });
+      await fixtureInsertOperation(client, merchant, id, {
+        type: 'AUTHORIZE',
+        amountMinor: 10_000n,
+        status: 'SUCCEEDED',
+      });
+      await fixtureInsertOperation(client, merchant, id, {
+        type: 'CAPTURE',
+        amountMinor: 10_000n,
+        status: 'SUCCEEDED',
+      });
+      await fixtureUpdatePayment(client, id, {
+        authorized_amount_minor: 10_000n,
+        captured_amount_minor: 10_000n,
+        authorization_outcome: 'AUTHORIZED',
+      });
+
       const error = await fixtureUpdatePayment(client, id, {
-        reserved_refund_amount_minor: 4_001n,
+        reserved_refund_amount_minor: 10_001n,
+        unresolved_refund_count: 1,
       }).catch((caught: unknown) => caught);
       await client.query('ROLLBACK');
-      expect((error as { constraint?: string }).constraint).toBe(
-        'payments_refund_reservation_bound',
+
+      expect(['payments_refund_reservation_bound', 'payments_reserved_le_captured']).toContain(
+        (error as { constraint?: string }).constraint,
       );
     } finally {
       client.release();

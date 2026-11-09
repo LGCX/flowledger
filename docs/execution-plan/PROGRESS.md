@@ -1775,7 +1775,47 @@ succeeded AUTHORIZE, and one INSERT had a `$6` placeholder with no value.
 The `payments.payments` coverage list gained `payments_active_exclusive_operation_fkey` (added here), and
 its TRUNCATE expectation moved to the FK's own refusal (0A000), which now fires before the trigger.
 
-**Next task:** `P02-T10`.
+## P02-T10 — Migration 0260: deferred payment-aggregate consistency trigger
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T11.
+
+```text
+TASK P02-T10 — NEEDS-REVIEW
+Acceptance criteria:
+  - pointer null / stale / terminal / refund-target / cleared fails at commit -> met
+  - reservation sum and count drift fails, whether caused by the payment or an operation row -> met
+  - captured/refunded totals and outcome vs successful-operation cardinality fail -> met
+  - consistent multi-row transitions commit -> met (accept two refunds, resolve one, reject one)
+  - no runtime or function-owner role can disable the trigger -> met (42501)
+Tests added: test/integration/db/payment-consistency.test.ts (15)
+  break-and-restore (each observed failing, then restored) — all four bit:
+    pointer assertion removed     -> 3 cases fail (handoff item)
+    reservation-sum removed       -> 3 cases fail
+    refunded-total removed        -> 1 case fails
+    cancel assertion removed      -> 1 case fails
+    baseline after restore        -> 15 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 262, e2e 0
+Deviations from the task text:
+  1. The payment id is read as `coalesce(to_jsonb(NEW) ->> 'payment_id', to_jsonb(NEW) ->> 'id')`.
+     The documented `CASE TG_TABLE_NAME WHEN 'payments' THEN NEW.id ELSE NEW.payment_id` fails at
+     runtime with 42703 on `payments`, which has no `payment_id` column: plpgsql resolves every field
+     in the CASE, not just the taken branch.
+  2. P02-T08's "reservation equals captured" positive case moved here as a consistent sequence, and its
+     negative half now runs inside a rolled-back transaction. A reservation with no refund rows behind
+     it can no longer commit, which is the point of this trigger.
+Contract/plan issues found: none.
+Next task: P02-T11.
+```
+
+**The trigger immediately invalidated earlier fixtures, which is the correct outcome.** P02-T09's helpers
+committed each statement on its own, so an operation insert and the matching payment update landed in
+separate transactions and the deferred check saw the gap. The fix is shared: `fixtureSyncPayment`
+recomputes the payment's aggregate fields from its operation rows, so every fixture is consistent by
+construction rather than by hand-arithmetic. Three P02-T09 cases that only need a *statement-time* error
+(the partial unique indexes) now run inside a rolled-back transaction, where the deferred check never
+runs — which is what the task text asks for.
+
+**Next task:** `P02-T11`.
 
 
 
