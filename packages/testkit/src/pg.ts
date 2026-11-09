@@ -13,7 +13,7 @@
  */
 import pg from 'pg';
 
-import { LOGIN_RUNTIME_ROLES, type LoginRuntimeRole } from '@flowledger/database';
+import { LOGIN_RUNTIME_ROLES, mapPgError, type LoginRuntimeRole } from '@flowledger/database';
 
 /** Synthetic, local-only. Never a real credential. */
 export const TEST_ROLE_PASSWORD = 'fl_local_test_password';
@@ -200,7 +200,9 @@ export async function withRole<T>(
     return result;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
+    // Map like `withTransaction`, so a test asserting a domain code sees a DomainError whichever
+    // helper it ran the statement through.
+    throw mapPgError(error);
   } finally {
     client.release();
   }

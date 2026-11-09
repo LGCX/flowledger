@@ -1594,7 +1594,61 @@ Next task: P02-T06.
 4. My prefix generator was not injective (`padStart` + a character substitution could collide), which
    surfaced as a duplicate-key failure. It is now a direct base-32 encoding of the counter.
 
-**Next task:** `P02-T06`.
+## P02-T06 — Migration 0220: provider configuration and route selection
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T07.
+
+```text
+TASK P02-T06 — NEEDS-REVIEW
+Acceptance criteria:
+  - every named constraint/unique index has a negative test on all seven tables -> met
+  - a route cannot reference another merchant's account or a differing provider/env -> met (composite FK)
+  - at most one active default / current version / active credential / active secret -> met
+  - select_route returns one (account, version) or PROVIDER_ROUTE_UNAVAILABLE for all five causes -> met,
+    each asserted by reason: NO_ROUTE, ROUTE_DISABLED, ACCOUNT_NOT_ACTIVE, NO_CURRENT_VERSION
+  - no runtime role can read or write any provider table -> met
+Tests added: test/integration/db/providers.test.ts (45)
+  break-and-restore (each observed failing, then restored):
+    FOR SHARE removed (handoff)                 -> the rollover race fails
+    account-status guard removed                -> ACCOUNT_NOT_ACTIVE case fails
+    route-status guard removed                  -> first run DID NOT bite (see below); after adding the
+                                                   explicit-code case it does
+    monotonic-version trigger dropped           -> the skipped-version case fails
+    credential lifecycle guard dropped          -> 2 cases fail
+    runtime roles granted SELECT                -> the privilege case fails
+    composite route FK weakened to id only      -> all three cross-tenant/code/env cases fail
+    baseline after restore                      -> 45 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. `providers.select_route` is VOLATILE, not STABLE. PostgreSQL refuses a locking read in a
+     non-volatile function; the FOR SHARE lock is what the handoff item requires, and it cannot work
+     in a STABLE function.
+  2. A new policy `provider_account_versions_function_owner_lock FOR UPDATE ... USING (true)
+     WITH CHECK (false)` plus an UPDATE grant on that one table. A locking read applies the UPDATE
+     policy, and with none it returns **no rows** — the function reported NO_CURRENT_VERSION for a
+     perfectly current account until this existed. WITH CHECK (false) means the grant permits locking
+     and nothing else.
+  3. `assertConstraintCoverage` now reports bare index names. `indexrelid::regclass::text`
+     schema-qualifies for any non-public schema, so every declared unique index looked absent.
+  4. `withRole` in the testkit now maps SQLSTATE through `mapPgError`, so a test sees a DomainError
+     whichever helper it ran the statement through.
+Contract/plan issues found: none.
+Next task: P02-T07.
+```
+
+**Test defects found by the breaks and by probe tests** (all before commit):
+1. `fl_version_monotonic` read `NEW.provider_account_id` unconditionally, so it failed on the secrets
+   table with `record "new" has no field "provider_account_id"`. It now reads the key column generically
+   from `to_jsonb(NEW)`.
+2. `provider_accounts_external_identity_key` is `NULLS NOT DISTINCT`, so two accounts for the same
+   merchant/provider/environment collide even with NULL references — fixtures now carry distinct
+   synthetic references.
+3. Three `it.each` route cases shared one merchant id, so the second fixture collided with the first;
+   and the "no route" case created the route it expected to be missing.
+4. The `ROUTE_DISABLED` branch was unreachable through the default path (a disabled default is simply
+   not selectable), which is exactly why the break did not bite until an explicit-code case existed.
+
+**Next task:** `P02-T07`.
 
 
 

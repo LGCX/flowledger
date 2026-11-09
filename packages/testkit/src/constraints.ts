@@ -31,12 +31,15 @@ export async function assertConstraintCoverage(
        -- 'p' included: a primary key is a constraint a task must name like any other.
        AND contype IN ('c', 'f', 'u', 'x', 'p')
     UNION
-    SELECT indexrelid::regclass::text AS name, 'unique index' AS kind
-      FROM pg_index
-     WHERE indrelid = $1::regclass
-       AND indisunique
+    -- relname, not regclass::text: the latter schema-qualifies the name for any schema other than
+    -- public, so a declared merchant_routes_one_default would look absent.
+    SELECT i.relname AS name, 'unique index' AS kind
+      FROM pg_index x
+      JOIN pg_class i ON i.oid = x.indexrelid
+     WHERE x.indrelid = $1::regclass
+       AND x.indisunique
        AND NOT EXISTS (
-         SELECT 1 FROM pg_constraint c WHERE c.conindid = pg_index.indexrelid
+         SELECT 1 FROM pg_constraint c WHERE c.conindid = x.indexrelid
        )
     `,
     [table],
