@@ -209,4 +209,51 @@ is followed.)
 Next task: P00-T03 (dependencies satisfied: yes — P00-T01).
 ```
 
-**Next task:** `P00-T03`, after owner approval.
+## P00-T03 — Base configuration, lifecycle, `.env.example`, and `docs/CONFIG.md`
+
+**Status:** `NEEDS-REVIEW` — all gates green, awaiting owner approval before P00-T04.
+
+```text
+TASK P00-T03 — NEEDS-REVIEW
+Commit: 5ef53ee on task/p00-t03-base-config
+Acceptance criteria:
+  - no message from packages/config contains a variable's value -> met
+    (ConfigError builds `${variable}: ${reason}` from fixed phrases; proven by break 4)
+  - runMain calls stop at most once across repeated signals -> met (break 1)
+  - health server returns the exact bodies/status codes -> met
+    (/healthz 200 {"status":"ok"}, /readyz 503 {"status":"not_ready"} then
+     200 {"status":"ready"}, unknown path 404, port 0 reports the bound port)
+  - every .env.example variable has a CONFIG.md row and vice versa -> met
+    (13 = 13, enforced by a test; break 5)
+Tests added: packages/config/src/base.test.ts :: 16 cases
+             packages/config/src/lifecycle.test.ts :: 11 cases
+  break-and-restore (each observed failing, then restored):
+    once-only shutdown guard removed   -> `second signal ignored` fails  [handoff item]
+    grace timeout removed              -> `stop exceeds grace exits 1` fails
+    readiness gating removed           -> `/readyz 503 then 200` fails
+    ConfigError echoes value           -> `non-integer ... not echoed` fails
+    CONFIG.md row renamed              -> parity test fails
+    Object.freeze removed              -> `result is frozen` fails
+    baseline after restore             -> 27 passing
+Commands: pnpm check -> 0 (27 unit + 52 contract) | pnpm test:integration -> 0
+          pnpm test:e2e -> 0 | eslint . -> 0
+          clean clone: install --frozen-lockfile 0, check 0
+Deviations from the task text:
+  1. `.env.example` carries a `# Consumer:` line above each variable. The task prose
+     requires "every line commented with its consumer" while its sample block shows
+     no comments; followed the prose.
+  2. `docs/CONFIG.md` adds the two required restricted-reader notes plus a short
+     "Not in this table yet" section (DATABASE_URL arrives P02; the secret resolver P06).
+Contract/plan issues found: **P00 phase-overview interface table (line 24) disagrees
+with this task's body and with its consumer.** It states
+`startHealthServer(port: number, isReady: () => boolean)`; the task body's signature
+block and P00-T04 step 5 (`startHealthServer(readPort(env, 'HEALTH_PORT'))` then
+`health.setReady(true)`) both use `startHealthServer(port)` returning an object with
+`setReady`. Implemented the body/consumer form — 2 of 3 sources including the real
+caller. Proposed `docs(plan):` edit: change line 24 to
+`startHealthServer(port: number): Promise<HealthServer>; interface HealthServer { readonly port: number; setReady(ready: boolean): void; close(): Promise<void> }`.
+Not applied: outside this task's Files list.
+Next task: P00-T04 (dependencies satisfied: yes — P00-T01).
+```
+
+**Next task:** `P00-T04`, after owner approval.
