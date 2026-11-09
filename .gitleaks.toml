@@ -21,3 +21,17 @@ paths = [
   # that creates them. It is not shipped, and its whole purpose is to name them.
   '''docs/execution-plan/.*\.md''',
 ]
+
+# The `generic-api-key` rule fires on any high-entropy value sitting next to a key-like name, which
+# catches the repository's own identifier fields in the contract examples: `"orderingKey": "pay_…"`
+# and `Idempotency-Key: 0192f4e7-…`. Those are published identifiers, not credentials — `paymentId`
+# and `correlationId` are path parameters in the OpenAPI document and envelope UUIDs are echoed to
+# merchants — so allowlisting their shapes is narrower than allowlisting the contract files, and it
+# also covers identifiers added later. A credential that happened to be shaped exactly like an
+# entity ULID or a UUID would be missed; that is the accepted trade, and it is recorded here.
+regexes = [
+  # Entity ID: `pay_`, `op_`, `mer_`, `cor_`, … — prefix, underscore, Crockford base32, first char 0-7.
+  '''[a-z][a-z0-9]{1,15}_[0-7][0-9A-HJKMNP-TV-Z]{25}''',
+  # Envelope UUID (the canonical example id used throughout the contracts).
+  '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
+]
