@@ -2,6 +2,10 @@ import { defineConfig } from 'vitest/config';
 
 const shared = {
   resolve: { conditions: ['@flowledger/source'] },
+  // Vitest resolves in SSR mode, where `ssr.resolve.conditions` governs. Without this,
+  // a workspace package resolves through its `default` condition to `dist/`, so contract
+  // tests silently validate stale build output instead of source.
+  ssr: { resolve: { conditions: ['@flowledger/source'] } },
   server: { deps: { inline: [/@flowledger\//] } },
 };
 
