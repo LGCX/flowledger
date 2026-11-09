@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "description": "Canonical request-hash vectors from docs/05 \u00a7Canonical request hash. 'canonicalJson' is the exact UTF-8 text hashed; 'sha256' is its lowercase hex digest. The pm_sandbox_123 value is a synthetic byte sequence standing in for a payment-method reference: request hashing never validates the token, so these digests do not depend on which token family the API accepts. Do not change these bodies without recomputing both digests.",
+  "vectors": [
+    {
+      "id": "create",
+      "commandType": "CREATE_PAYMENT",
+      "pathParams": {},
+      "body": {
+        "amount": {
+          "amountMinor": "10000",
+          "currency": "USD"
+        },
+        "paymentMethodRef": "pm_sandbox_123",
+        "provider": "fake-provider"
+      },
+      "ifMatch": null,
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{\"amount\":{\"amountMinor\":\"10000\",\"currency\":\"USD\"},\"paymentMethodRef\":\"pm_sandbox_123\",\"provider\":\"fake-provider\"},\"commandType\":\"CREATE_PAYMENT\",\"hashVersion\":1,\"ifMatch\":null,\"method\":\"POST\",\"pathParams\":{},\"route\":\"/v1/payments\"}",
+      "sha256": "8ad048fb808f257f1a6d7e0684728cc35648d9efc251977f8a4a457127fff893"
+    },
+    {
+      "id": "create-provider-omitted",
+      "commandType": "CREATE_PAYMENT",
+      "pathParams": {},
+      "body": {
+        "amount": {
+          "amountMinor": "10000",
+          "currency": "USD"
+        },
+        "paymentMethodRef": "pm_sandbox_123"
+      },
+      "ifMatch": null,
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{\"amount\":{\"amountMinor\":\"10000\",\"currency\":\"USD\"},\"paymentMethodRef\":\"pm_sandbox_123\"},\"commandType\":\"CREATE_PAYMENT\",\"hashVersion\":1,\"ifMatch\":null,\"method\":\"POST\",\"pathParams\":{},\"route\":\"/v1/payments\"}",
+      "sha256": "fb1dfc30967cc6700d1c68a60dc66641b9c4d0e24caac5977dafcc0fd06b3c31"
+    },
+    {
+      "id": "authorize-no-if-match",
+      "commandType": "AUTHORIZE",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {},
+      "ifMatch": null,
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{},\"commandType\":\"AUTHORIZE\",\"hashVersion\":1,\"ifMatch\":null,\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/authorizations\"}",
+      "sha256": "a1230cd21ed16a0405bf191af6e227a8fb15b968942b1adcbec6a88de492c378"
+    },
+    {
+      "id": "authorize-if-match",
+      "commandType": "AUTHORIZE",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {},
+      "ifMatch": "\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v1\"",
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{},\"commandType\":\"AUTHORIZE\",\"hashVersion\":1,\"ifMatch\":\"\\\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v1\\\"\",\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/authorizations\"}",
+      "sha256": "87529151b8a259faf86f4879bb3b7fc309576ffa0b7a62d97236fa70abfe38b2"
+    },
+    {
+      "id": "capture",
+      "commandType": "CAPTURE",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {
+        "amount": {
+          "amountMinor": "10000",
+          "currency": "USD"
+        }
+      },
+      "ifMatch": "\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v3\"",
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{\"amount\":{\"amountMinor\":\"10000\",\"currency\":\"USD\"}},\"commandType\":\"CAPTURE\",\"hashVersion\":1,\"ifMatch\":\"\\\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v3\\\"\",\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/captures\"}",
+      "sha256": "33451ce36d3080ffc06e2a3fb87d6fd5648fc6186d4244ece088a143270ed5a9"
+    },
+    {
+      "id": "capture-amount-changed",
+      "commandType": "CAPTURE",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {
+        "amount": {
+          "amountMinor": "10001",
+          "currency": "USD"
+        }
+      },
+      "ifMatch": "\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v3\"",
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{\"amount\":{\"amountMinor\":\"10001\",\"currency\":\"USD\"}},\"commandType\":\"CAPTURE\",\"hashVersion\":1,\"ifMatch\":\"\\\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v3\\\"\",\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/captures\"}",
+      "sha256": "7fd0ff71fe706f76a7e3127fe33af9d6664c11cb2ba73b814f13ba310dcd9061"
+    },
+    {
+      "id": "refund",
+      "commandType": "REFUND",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {
+        "amount": {
+          "amountMinor": "2500",
+          "currency": "USD"
+        }
+      },
+      "ifMatch": "\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v5\"",
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{\"amount\":{\"amountMinor\":\"2500\",\"currency\":\"USD\"}},\"commandType\":\"REFUND\",\"hashVersion\":1,\"ifMatch\":\"\\\"payment-pay_01ARZ3NDEKTSV4RRFFQ69G5FAV-v5\\\"\",\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/refunds\"}",
+      "sha256": "df88a3bd0f7469c0014c7bfad8abdab17f2a858a26f04fdb65a1957cae7ce942"
+    },
+    {
+      "id": "cancel-no-if-match",
+      "commandType": "CANCEL",
+      "pathParams": {
+        "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      },
+      "body": {},
+      "ifMatch": null,
+      "canonicalJson": "{\"apiVersion\":\"v1\",\"body\":{},\"commandType\":\"CANCEL\",\"hashVersion\":1,\"ifMatch\":null,\"method\":\"POST\",\"pathParams\":{\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\"},\"route\":\"/v1/payments/{paymentId}/cancellations\"}",
+      "sha256": "5dee2b77d014659d4bac2188fb85318856c3195bb022b8b7925348b41e9a4d15"
+    }
+  ]
+}

@@ -1020,7 +1020,45 @@ Next task: P01-T05.
 implementation was right, and the row was moved to the accepted table. Worth recording because the
 failure looked like an implementation bug and was a transcription bug.
 
-**Next task:** `P01-T05`.
+## P01-T05 — Canonical JSON and canonical API request hash
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T06.
+
+```text
+TASK P01-T05 — NEEDS-REVIEW
+Acceptance criteria:
+  - all golden hashes reproduce from request-hash.v1.json -> met, 8/8. The canonical strings were
+    also re-derived with an independent Python sha256 and matched, so A-03 is confirmed by
+    something other than the implementation under test.
+  - each semantic change alters the hash (paymentId, amountMinor, currency, provider,
+    paymentMethodRef, ifMatch add/remove/change, commandType) -> met, 8 separate cases
+  - credentials/correlation/idempotency key cannot be passed -> met: the input type has no field
+  - invalid ifMatch (weak, list, v0, unquoted, wrong prefix, empty) rejected -> met, 6 cases
+Tests added: canonical-json.test.ts (24), request-hash.test.ts (25), golden/request-hash.v1.json
+  break-and-restore (each observed failing, then restored):
+    key sort removed (handoff item)        -> 4 fail, including every golden hash
+    ifMatch omitted from the canonical doc -> 5 fail
+    ifMatch validation removed             -> 6 fail
+    pathParams key-set check removed       -> 2 fail
+    baseline after restore                 -> 49 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. A body that cannot be canonicalised returns INTERNAL_ERROR/NON_CANONICAL_JSON rather than
+     INVALID_REQUEST/VALUE_MALFORMED. The task assigns VALUE_MALFORMED to the path-param and
+     ifMatch checks; it does not say what a non-canonicalisable body should be, and the body shape
+     is valid while the value cannot be hashed, so the specific reason is more useful in a log.
+  2. `canonicalJson` accepts an object with a null prototype (a test pins it), because `jsonb`
+     round-trips do not preserve `Object.prototype`. Rejecting it would break re-parsing.
+Contract/plan issues found: none.
+Next task: P01-T06.
+```
+
+**Two test bugs, not code bugs.** The first run of the golden cases failed with actuals that were
+the hex of the hex: `hashOf` already returned hex and I applied `toHex` twice. The second was an
+assertion on the wrong error code for a non-canonicalisable body. Both were in the test; the
+implementation reproduced all eight digests on its first run.
+
+**Next task:** `P01-T06`.
 
 
 
