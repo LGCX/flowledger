@@ -15,7 +15,9 @@
     "test:contracts": "vitest run --project contracts",
     "test:integration": "vitest run --project integration",
     "test:e2e": "vitest run --project e2e",
-    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:contracts"
+    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:contracts",
+    "db:up": "docker compose -f infra/docker/compose.yaml up -d --wait",
+    "db:down": "docker compose -f infra/docker/compose.yaml down -v"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
@@ -39,7 +41,9 @@
     "@flowledger/providers": "workspace:*",
     "@flowledger/testkit": "workspace:*",
     "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
     "eslint": "9.39.5",
+    "pg": "8.23.1",
     "prettier": "3.9.10",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.1",

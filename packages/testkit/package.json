@@ -8,5 +8,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "@testcontainers/postgresql": "12.2.1",
+    "pg": "8.23.1",
+    "testcontainers": "12.2.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
   }
 }

@@ -1,0 +1,46 @@
+# Local dependency stack. Every tag is exact; nothing floats on `latest`.
+# Defaults are inline (`${VAR:-default}`) so a clean clone needs no .env file, and every
+# variable is documented in docs/CONFIG.md.
+name: flowledger
+
+services:
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowledger_local_only}
+      POSTGRES_DB: flowledger
+      FL_SIMULATOR_PASSWORD: ${FL_SIMULATOR_PASSWORD:-fl_simulator_local_only}
+      FL_SIMULATOR_TRUTH_PASSWORD: ${FL_SIMULATOR_TRUTH_PASSWORD:-fl_simulator_truth_local_only}
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d flowledger']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:592.0.0-emulators
+    command: >-
+      gcloud beta emulators pubsub start
+      --host-port=0.0.0.0:8085 --project=flowledger-local
+    ports:
+      - '8085:8085'
+
+  # One container replaces a separate collector + backend; a metrics backend is
+  # deferred to P11 [ASSUMPTION A-06].
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '16686:16686' # UI
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+
+volumes:
+  postgres-data:

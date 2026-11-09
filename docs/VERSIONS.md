@@ -5,15 +5,17 @@ committed. This file is updated **in the same commit as any version bump** (CONV
 
 ## Toolchain
 
-| Tool           | Pinned version | Where pinned                                                       |
-| -------------- | -------------- | ------------------------------------------------------------------ |
-| Node.js        | 24.22.1        | `.nvmrc`, `package.json#engines.node`                              |
-| pnpm           | 10.34.9        | `package.json#packageManager` (Corepack)                           |
-| PostgreSQL     | 17             | Docker image tag, `infra/docker/compose.yaml` (created by P00-T06) |
-| Docker Engine  | 24.0 minimum   | host requirement                                                   |
-| Docker Compose | v2.20+         | host requirement                                                   |
-| Terraform      | 1.9+           | first used in P13                                                  |
-| k6             | 0.5x+          | first used in P12                                                  |
+| Tool             | Pinned version    | Where pinned                                                           |
+| ---------------- | ----------------- | ---------------------------------------------------------------------- |
+| Node.js          | 24.22.1           | `.nvmrc`, `package.json#engines.node`                                  |
+| pnpm             | 10.34.9           | `package.json#packageManager` (Corepack)                               |
+| PostgreSQL       | 17.11             | `compose.yaml`; `POSTGRES_IMAGE` in `packages/testkit/src/postgres.ts` |
+| Pub/Sub emulator | 592.0.0-emulators | `compose.yaml` image `gcr.io/google.com/cloudsdktool/google-cloud-cli` |
+| Jaeger           | 1.76.0            | `compose.yaml` image `jaegertracing/all-in-one`                        |
+| Docker Engine    | 24.0 minimum      | host requirement                                                       |
+| Docker Compose   | v2.20+            | host requirement                                                       |
+| Terraform        | 1.9+              | first used in P13                                                      |
+| k6               | 0.5x+             | first used in P12                                                      |
 
 Node.js is the newest 24.x patch that had been released for at least 14 days when this task ran
 (24.22.1, released 2026-10-20). `engine-strict=true` in `.npmrc` makes a mismatched Node or pnpm
@@ -42,14 +44,18 @@ Declared per application in `apps/<app>/package.json`, pinned exactly. Every one
 CONVENTIONS §2 approved list, and `test/contract/dependency-policy.test.ts` fails on any addition
 that is not.
 
-| Package                    | Pinned version | Declared by                               |
-| -------------------------- | -------------- | ----------------------------------------- |
-| `@nestjs/core`             | 11.2.8         | every app (all nine)                      |
-| `@nestjs/common`           | 11.2.8         | every app (all nine)                      |
-| `@nestjs/platform-fastify` | 11.2.8         | `api` only                                |
-| `fastify`                  | 5.12.8         | `api` only                                |
-| `rxjs`                     | 7.8.2          | every app (NestJS peer)                   |
-| `reflect-metadata`         | 0.2.2          | every app (decorator metadata at runtime) |
+| Package                      | Pinned version | Declared by                               |
+| ---------------------------- | -------------- | ----------------------------------------- |
+| `@nestjs/core`               | 11.2.8         | every app (all nine)                      |
+| `@nestjs/common`             | 11.2.8         | every app (all nine)                      |
+| `@nestjs/platform-fastify`   | 11.2.8         | `api` only                                |
+| `fastify`                    | 5.12.8         | `api` only                                |
+| `rxjs`                       | 7.8.2          | every app (NestJS peer)                   |
+| `reflect-metadata`           | 0.2.2          | every app (decorator metadata at runtime) |
+| `@testcontainers/postgresql` | 12.2.1         | `packages/testkit` (PostgreSQL fixture)   |
+| `testcontainers`             | 12.2.1         | `packages/testkit`                        |
+| `pg`                         | 8.23.1         | `packages/testkit`, root (integration)    |
+| `@types/pg`                  | 8.23.1         | `packages/testkit`, root                  |
 
 `@flowledger/config` is a `workspace:*` dependency of every app, and every app is a `workspace:*`
 devDependency of the root so `test/contract/**` can boot it.
