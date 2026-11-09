@@ -269,8 +269,15 @@ paths:
       x-required-scopes: ['payments:write']
       summary: Refund a payment
       description: >-
-        Durably accepts one refund. The refundable limit is evaluated while the
-        payment aggregate is locked. Only one unresolved operation is permitted.
+        Durably accepts one refund. `REFUND` is a concurrent operation class, so
+        many unresolved refunds may exist for one payment at the same time; the
+        MVP places no cap on them. Each unresolved refund reserves its amount.
+        The refundable limit
+        `refundedAmountMinor + reservedRefundAmountMinor + requested amount <=
+        capturedAmountMinor` is evaluated while the payment aggregate is locked,
+        and an unresolved refund keeps holding only its own reservation, so it
+        does not block refunds against the remaining available amount. See
+        ADR-0003.
       x-flowledger-command-type: REFUND
       parameters:
         - $ref: '#/components/parameters/PaymentId'
