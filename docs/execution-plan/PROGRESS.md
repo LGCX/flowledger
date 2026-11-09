@@ -2175,3 +2175,44 @@ Two notes for whoever reads this next:
   a SQL hash and a TypeScript hash of the same document disagree.
 - The `GRANT USAGE ON SCHEMA ledger` ruling was load-bearing in a way the plan predicted precisely: with
   it absent, `fl_operator_readonly` gets `42501` even though `GRANT EXECUTE` is present.
+
+## P03-T02 — Ledgers, accounts, balance projection, account creation, logical-balance view
+
+**Status:** `NEEDS-REVIEW` — all gates green; awaiting owner `approve` before merging.
+
+```text
+TASK P03-T02 — NEEDS-REVIEW
+Commit: <sha> on task/p03-t02-ledger-accounts
+Acceptance criteria:
+  - every docs/07 check rejects a direct insert, one negative per check -> met (18 check cases + FK cases)
+  - a merchant account with a bucket index is rejected -> met (accounts_bucket_platform_only)
+  - code disagreeing with logical_code/bucket_index rejected -> met (accounts_code_derived)
+  - bucket_index = bucket_count and bucket_count = 0 rejected; 99/100 accepted -> met
+  - account update/delete/truncate and balance delete/truncate fail as fl_migration_owner -> met
+  - OPEN -> CLOSED succeeds; CLOSED -> OPEN fails -> met (ACCOUNT_CLOSE_ONE_WAY)
+  - account without a balance row fails at COMMIT; create_account succeeds -> met
+  - fl_api and every runtime role except fl_operator_readonly get 42501 on all four relations -> met
+Tests added: test/integration/ledger/accounts.test.ts (37)
+  break-and-restore (each observed failing, then restored) — four bit:
+    code-derivation check removed (handoff)        -> the striping case fails
+    deferred balance trigger removed entirely      -> ACCOUNT_WITHOUT_BALANCE case fails
+    balance truncate guard removed                 -> the truncate case fails
+    reopen allowed                                 -> the one-way case fails
+    baseline after restore                         -> 37 passing
+Commands: scripts/verify-task.mjs --full -> check 0, build 0, integration 499/499, e2e 0
+  pnpm verify:ledger -> not yet available (created by P03-T11)
+Deviations from the task text: none in the schema. Two findings:
+  1. `accounts_owner_type` is unreachable on its own. Every logical code begins `platform.` or
+     `merchant.`, so a bogus owner type always trips `accounts_logical_code_owner` first (CHECKs are
+     evaluated in alphabetical name order). The test asserts the constraint that actually fires and
+     records the subsumption rather than pretending otherwise.
+  2. The balance no-mutation guard needed its own function. A statement-level TRUNCATE trigger has no
+     NEW/OLD, so reusing the UPDATE guard made the truncate succeed silently — the break for it is what
+     exposed this, and it is why the split exists.
+Contract/plan issues found: none.
+Next task: P03-T03 (dependencies satisfied: yes)
+```
+
+One more thing worth recording for later: renaming a trigger does not disable it. My first attempt at the
+deferred-trigger break renamed `accounts_require_balance` and the suite stayed green — a broken proof that
+would have read as "the trigger is unnecessary". Deleting the statement is the only valid removal.
