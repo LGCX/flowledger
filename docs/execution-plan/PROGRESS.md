@@ -1424,7 +1424,33 @@ URL — so it silently rotated `fl_migration_owner` and the next two tests faile
 fixture uses one container per run, which makes roles genuinely shared state; tests that touch them must
 use the fixture's own password. That is a real hazard for every later DB test, not a one-off.
 
-**Next task:** `P02-T02`.
+## P02-T02 — Transaction helper and domain-error mapping
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T03.
+
+```text
+TASK P02-T02 — NEEDS-REVIEW
+Acceptance criteria:
+  - app.merchant_id visible inside fn, empty on the same pooled connection afterwards -> met (max: 1)
+  - 40001/40P01 retried at most 5 times; the 6th failure propagates the original pg error -> met
+  - non-retryable errors roll back every statement of the attempt -> met
+  - deferred-constraint failure at COMMIT rejects and leaves no rows -> met
+Tests added: packages/database/src/errors.test.ts (11), test/integration/db/tx.test.ts (9)
+  break-and-restore (each observed failing, then restored):
+    retry cap 6 -> 100 (handoff)                     -> the give-up case fails
+    tenant context set for the session, not the txn   -> the leak case fails
+    P0001 added to the retryable set                  -> the no-retry-domain-error case fails
+    ROLLBACK removed                                  -> the three retry cases fail
+    baseline after restore                            -> 9 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. The post-transaction GUC assertion accepts `''` as well as null. PostgreSQL reports an unset GUC
+     as an empty string once it has been set and reset; the criterion says "empty (`''` or null)".
+Contract/plan issues found: none.
+Next task: P02-T03.
+```
+
+**Next task:** `P02-T03`.
 
 
 
