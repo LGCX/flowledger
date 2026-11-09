@@ -107,6 +107,9 @@ commit.
    for any minimum below the fixed component. Deliberately left in place: keeping a
    redundant safety `CHECK` is the safe default, and P02-T07 instructs overlapping
    negatives to assert SQLSTATE `23514` rather than a constraint name.
+   **Corrected by P02-REVIEW:** only its `>= fixed` half is subsumed. With fixed 0 and
+   minimum 0 the fee-within-minimum check passes, so this constraint alone enforces
+   docs/02 "at least 1". See `docs/evidence/P02-review.md` finding 5.
 
 No blocking items remain before `P00-T01`.
 
@@ -1679,6 +1682,8 @@ Deviations from the task text:
      guard should the fee formula stop including the fixed amount; the test states this rather than
      asserting a distinction that does not exist. This supersedes the earlier note that called it
      "redundant but harmless" — it is redundant, provably, and now recorded as such.
+     [Corrected by P02-REVIEW: wrong for fixed 0 / minimum 0. The relaxation to `>= 1` kept the half
+     that matters, which is why it could not fail. See docs/evidence/P02-review.md finding 5.]
   2. Version reuse is refused by the monotonic trigger (INVALID_TRANSITION) before the unique keys are
      consulted, so the duplicate-version case asserts the trigger rather than a constraint name. The
      unique keys remain as a second line of defence and are covered by assertConstraintCoverage.
@@ -2080,4 +2085,37 @@ Verified: clean volume, POSTGRES_HOST_PORT=5433 → db:up (port check passes) �
   (0 applied, 10 skipped). Shadowing preflight verified failing loudly on port 5432.
 Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 391, e2e 0
 Next task: P03-T01 (Ledger core, M3).
+```
+
+## P02-REVIEW — independent audit of P00–P02
+
+**Status:** `NEEDS-REVIEW` — 11 findings fixed on `review/p02-audit-fixes`, 6 contract questions raised.
+Full account: `docs/evidence/P02-review.md`.
+
+```text
+P02-REVIEW — NEEDS-REVIEW
+Branch: review/p02-audit-fixes (b0ddd06, b821d30, 79b0f30, 6ac96f9, e33aeb7, + this docs commit)
+Found by running, not reading:
+  - test:integration was flaky (1 in 4): the 90-day boundary test compared host Date.now() with the
+    container's clock_timestamp(); and `+ interval '90 days'` is TimeZone-dependent (+1h across DST)
+  - fee_policies_minimum_capture is load-bearing (fixed 0, minimum 0); the recorded proof was wrong
+  - the lifecycle property walk reached 0 captures in 2000 runs; six guards were removable
+Fixes:
+  - migrations 0291 (replay window in hours), 0292 (occurred_at + registry FK in the outbox proof),
+    0293 (fee snapshot = policy row = payment binding; exact capture fee), 0294 (3-authorization limit)
+  - domain: FAILED authorization no longer sets DECLINED; zero amounts refused; property walk rebuilt
+    with an independent oracle and a reach floor
+  - lookupCredential enters tenant scope only after verify(); seed/credentials issue need NODE_ENV
+    development|test
+Break-and-restore: every guard above mutated, named tests observed failing, restored.
+Test changes that look like loosening, and are not: fixture capture fee 30 -> the formula's fee; two
+  capture-fee boundary cases rebuilt because the formula now fires first; two exclusion cases moved off
+  an already-authorized payment (now refused by 0294); migrate-forward expects exactly 0291-0294 on the
+  0290-era dump instead of zero files.
+Not fixed (owner rulings): expired-key reuse with changed input (docs/05 vs docs/07); envelope hash byte
+  form (R6); api function owner; DLQ failure classes (R16); insert_outbox tenant check for non-payment
+  aggregates; checkPaymentInvariants gaps (new INVARIANT_IDS are a plan decision).
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 418, e2e 0;
+  test:integration x3 = 418/418 each; idempotency.test.ts 8/8; property tests at seeds 1, 42, 777,
+  20261108 x 500 runs.
 ```
