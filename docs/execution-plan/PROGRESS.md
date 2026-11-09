@@ -1,8 +1,14 @@
 # Implementation progress log
 
 Running log for the execution-plan implementation. Appended after every task.
-Format per entry: task ID, status (`DONE` / `BLOCKED` / `NEEDS-REVIEW`), commit SHA,
-commands run with pass/fail counts, deviations, open questions.
+Format per entry: task ID, status (`DONE` / `BLOCKED` / `NEEDS-REVIEW`), commands run with
+pass/fail counts, deviations, open questions.
+
+Entries after P00-T11 omit the commit SHA. CONVENTIONS §13 requires one task = one commit,
+and the report lives inside that commit, so the SHA cannot be quoted in it without either a
+second commit or amending after the gates ran. Owner decision (this session): one commit per
+task, report without the SHA. Entries up to P00-T11 quote a SHA because they were committed
+before that decision.
 
 ---
 
@@ -635,6 +641,29 @@ Next task: P00-T12.
 `TOTALS_SATISFY_PAYMENT_INVARIANTS` can emit two violations for one mutation (for example a
 `captured` above `authorized` also makes `voided > authorized - captured`). The test compares
 *distinct* rule names, so the intended rule is still asserted exactly rather than by count.
+
+## Workflow change — task gate
+
+**Status:** `DONE` (owner-approved process change, `chore/task-gate`)
+
+Two process failures were recorded during P00: a whole task was committed straight to `main`
+twice (P00-T09, P00-T11), and one commit was created while `pnpm check` was failing
+(`5fc5c29`). Both were caught only by accident — the first by a merge reporting nothing to
+merge, the second by a re-run afterwards. Neither is visible in review after the fact.
+
+`scripts/verify-task.mjs` now runs in a local `.git/hooks/pre-commit`:
+
+- refuses to commit when `HEAD` is `main`/`master`, naming the branch to create;
+- runs `pnpm check` and `pnpm build` and aborts the commit on failure.
+
+`--full` adds `test:integration` and `test:e2e`, and is the pre-merge verification recorded
+in each task report; CI calls the same script from P00-T14. The hook stays on the default set
+because those two lanes need the Docker stack, and a hook that requires Docker would block
+commits whenever it is not running. The hook is local to the clone (`.git/hooks` is not
+tracked), so a fresh clone has no gate until it is installed; the script is committed and
+reviewable, and CI is the shared enforcement point.
+
+`pnpm verify:task` is the entry point.
 
 **Next task:** `P00-T12`.
 
