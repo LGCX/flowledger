@@ -1,0 +1,49 @@
+[
+  { "file": "docs/04-EVENT_CONTRACTS.md", "index": 0, "target": { "registry": true } },
+  { "file": "docs/04-EVENT_CONTRACTS.md", "index": 1, "target": { "registry": true } },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 0,
+    "target": { "openapi": "PositiveMoney" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 1,
+    "target": { "openapi": "Payment" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 2,
+    "target": { "openapi": "PaymentOperation" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 3,
+    "target": { "openapi": "CreatePaymentRequest" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 4,
+    "target": { "openapi": "AmountCommandRequest" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 5,
+    "target": { "openapi": "AmountCommandRequest" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 6,
+    "target": { "openapi": "PaymentTimeline" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 7,
+    "target": { "openapi": "Problem" }
+  },
+  {
+    "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md",
+    "index": 8,
+    "target": { "openapi": "PaymentPage" }
+  }
+]
