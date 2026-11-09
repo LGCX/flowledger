@@ -364,7 +364,7 @@ The invariant checker is built now because a checker written after the system is
 - Prevent confirmed plus reserved refunds from exceeding captured value.
 - Turn on the invariant checker's reservation-integrity, posting-cardinality, and duplicate-effect classes now that their subject tables are populated.
 - Resolve rejections and definitive failures without ledger effects.
-- Make duplicate/late evidence idempotent and contradictory evidence create a discrepancy instead of overwriting history.
+- Make duplicate/late evidence idempotent, and stage contradictory evidence without applying it and without overwriting the terminal operation, its version, or the ledger. The discrepancy event itself belongs to M8: `payments.record_discrepancy(evidence_id)` needs a reconciliation case, and the case tables do not exist until then.
 - Add end-to-end polling helpers and a local demo CLI.
 
 ### Test and acceptance criteria
@@ -381,7 +381,7 @@ The invariant checker is built now because a checker written after the system is
 - An `UNKNOWN` refund keeps its reservation across process restarts while later refunds against the remaining amount still succeed.
 - Direct response duplicated 100 times produces one terminal transition and one journal transaction.
 - `flowledger verify` reports zero findings after every scenario in this milestone.
-- Each distinct newly deduplicated contradictory evidence row increments payment version and emits exactly one discrepancy event without rewriting the terminal operation; duplicate or corroborating evidence changes neither payment nor operation version.
+- Contradictory evidence is recorded but never applied: it does not rewrite the terminal operation, does not change the payment or operation version, posts nothing to the ledger, and emits no event in this milestone. Duplicate or corroborating evidence likewise changes neither version. The version increment and the single discrepancy event per distinct newly deduplicated contradiction are M8's, because the event requires a `caseId`.
 - Post-scenario balance rebuild matches the projection exactly.
 
 ## M8 — Ambiguous outcomes and reconciliation
@@ -393,6 +393,7 @@ The invariant checker is built now because a checker written after the system is
 - Write reconciliation-required events and commands in the same transition transaction.
 - Implement reconciliation cases, scheduling/backoff, activity history, provider lookup by operation ID or idempotency key, and evidence staging.
 - Apply verified lookup evidence through the same transition/ledger path used by direct responses.
+- Turn on the discrepancy path deferred from M7: `payments.record_discrepancy(evidence_id)` consumes each newly deduplicated contradiction once, creates or updates its reconciliation case, increments payment version, and writes exactly one `payment.discrepancy.detected.v1` carrying that `caseId`, while preserving confirmed fields, authorization outcome, subject operation/version, and ledger.
 - Move exhausted automated lookups to `REQUIRES_REVIEW` without releasing the payment.
 - On authorization success, create the durable `AUTHORIZATION_EXPIRY` case and schedule its first authoritative status lookup from the provider expiry hint or immutable account policy.
 - Implement the separate `ACTIVE`/`EXPIRED`/`INCONCLUSIVE` authorization lookup: reschedule active/inconclusive cases, and apply only explicit signed/authoritative expiry evidence through the guarded payment transition.
@@ -409,6 +410,7 @@ The invariant checker is built now because a checker written after the system is
 - Timeout → conclusive no-effect proof resolves failure with no ledger posting.
 - Inconclusive lookup exhausts policy and becomes visible `REQUIRES_REVIEW` while conflicting commands stay blocked.
 - Direct response and reconciliation evidence races converge on one transition/effect; the equivalent real webhook race is added in M9.
+- Each distinct newly deduplicated contradictory evidence row increments payment version exactly once and emits exactly one `payment.discrepancy.detected.v1` whose `caseId` resolves to a reconciliation case, without rewriting the terminal operation or the ledger; reapplying the same evidence changes nothing.
 - Authorization lookup `ACTIVE` reschedules without changing payment version; `INCONCLUSIVE` backs off/escalates; only explicit `EXPIRED` evidence changes the payment.
 - Expiry raced against capture/cancellation acceptance serializes on the payment lock: exactly one ordering wins, duplicate expiry is a no-op, and the expiry case is dismissed atomically after a successful capture or cancellation.
 - Restaging/reapplying the same evidence is idempotent.
