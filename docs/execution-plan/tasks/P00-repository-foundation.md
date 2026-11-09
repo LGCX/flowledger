@@ -12,7 +12,7 @@
 - `new Ajv2020({ strict: true })` **fails** on the checked-in schemas (`strictTypes` on `allOf` branches without `type`, `strictRequired` on conditional `required`). The contract only requires *unknown keywords* to be configuration errors (`schemas/README.md:21-31`). The binding Ajv configuration is therefore `{ strictSchema: true, strictTypes: false, strictRequired: false, strictTuples: true, allowUnionTypes: true, allErrors: true, verbose: false }` plus `ajv-formats` — all schemas compile with it.
 - `SwaggerParser.validate('openapi/openapi.yaml')` passes. The only `x-` keyword inside `components.schemas` is `x-flowledger-http-status-must-equal-body-status`.
 - Both JSON examples in `docs/04-EVENT_CONTRACTS.md` (lines 33 and 191) validate against their registered schemas.
-- Of the nine JSON examples in `docs/05-API_AND_IDEMPOTENCY_CONTRACT.md`, eight validate; the timeline example (line 314) fails **only** with `must have required property 'truncated'` (risk R-02).
+- Of the nine JSON examples in `docs/05-API_AND_IDEMPOTENCY_CONTRACT.md`, eight validated; the timeline example (line 314) failed **only** with `must have required property 'truncated'` (risk R-02). **R-02 is now fixed in the contract** (D-08 fix 2 added `"truncated": false`), so all nine are expected to validate. P00-T09 must confirm that with Ajv and must not reintroduce a `knownDeviation` entry.
 
 ### Interfaces consumed from earlier phases
 None.
@@ -605,15 +605,14 @@ None.
      { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 3, "target": { "openapi": "CreatePaymentRequest" } },
      { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 4, "target": { "openapi": "AmountCommandRequest" } },
      { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 5, "target": { "openapi": "AmountCommandRequest" } },
-     { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 6, "target": { "openapi": "PaymentTimeline" },
-       "knownDeviation": { "risk": "R-02", "onlyError": { "instancePath": "", "keyword": "required", "missingProperty": "truncated" } } },
+     { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 6, "target": { "openapi": "PaymentTimeline" } },
      { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 7, "target": { "openapi": "Problem" } },
      { "file": "docs/05-API_AND_IDEMPOTENCY_CONTRACT.md", "index": 8, "target": { "openapi": "PaymentPage" } }
    ]
    ```
-3. `prose-examples.test.ts`: extract blocks with `/^```json\n([\s\S]*?)^```/gm`; assert the number of blocks per file equals the manifest count (a new prose example without a manifest entry fails); `registry: true` → `validateMessage(block).ok === true`; `openapi: X` → validate against `$defs/X`. For `knownDeviation`, assert validation fails with **exactly** the one listed error (so any other drift is caught, and if the contract is fixed the test fails and the entry must be removed — R-02).
+3. `prose-examples.test.ts`: extract blocks with `/^```json\n([\s\S]*?)^```/gm`; assert the number of blocks per file equals the manifest count (a new prose example without a manifest entry fails); `registry: true` → `validateMessage(block).ok === true`; `openapi: X` → validate against `$defs/X`. Every entry must validate with **no** deviation: R-02 is fixed in the contract, so there is no `knownDeviation` mechanism to implement and no example is allowed to fail for a known reason. If a future contract change breaks an example, fix the contract or the implementation — do not add a deviation escape.
 
-**Expected behavior** — 10 of 11 prose examples validate; the timeline example fails only on `truncated`; all component examples validate; docs/05 has 27 problem codes equal to the OpenAPI enum.
+**Expected behavior** — 11 of 11 prose examples validate, including the timeline example now that `truncated` is present; all component examples validate; docs/05 has 27 problem codes equal to the OpenAPI enum.
 
 **Acceptance criteria**
 - [ ] OpenAPI validates and all local refs resolve.
@@ -623,7 +622,7 @@ None.
 
 **Testing requirements**
 - `test/contract/openapi.test.ts`: `openapi validates with swagger-parser`, `all component schemas compile`, `all component examples validate`, `invalid component example is reported with pointer`, `unregistered x- keyword is a configuration error`, `problem codes in docs/05 equal ProblemCode enum`, `each problem code is allowed by its HTTP-status Problem schema`.
-- `test/contract/prose-examples.test.ts`: `manifest covers every json block`, one case per manifest entry named `<file>#<index> validates against <target>`, `timeline example deviates only by missing truncated (R-02)`.
+- `test/contract/prose-examples.test.ts`: `manifest covers every json block`, one case per manifest entry named `<file>#<index> validates against <target>`, `timeline example validates with no deviation (R-02 fixed)`.
 - Command: `pnpm vitest run --project contracts test/contract/openapi.test.ts test/contract/prose-examples.test.ts`.
 
 **Non-goals** — No HTTP conformance probes against a running API (P04); no timeline `detail` per-kind validation (P04, R-03).
@@ -1055,7 +1054,7 @@ Shared-conflict files: `package.json`, `pnpm-lock.yaml`, `docs/VERSIONS.md`, `ts
 | ID | Risk / conflict | Impact | Severity | Recommended resolution | Blocked tasks |
 | --- | --- | --- | --- | --- | --- |
 | R-01 | `merchant.webhook.deliver.v1` ordering key contradiction. `schemas/common/message-envelope.v1.schema.json:18,55` makes `orderingKey` required (minLength 1) and `schemas/commands/merchant-webhook-deliver.v1.schema.json:14` pins it to a `whe_` ID; `docs/04-EVENT_CONTRACTS.md:79,102,106,353,363` and `schemas/README.md:86` say the command carries **no** ordering key; `docs/10-IMPLEMENTATION_PLAN.md:540` says "per-endpoint ordering key". | A schema-valid deliver command must carry an ordering key, so the docs/04:353 contract test ("published without an ordering key") cannot pass. | High | Contract-owner commit before P09: make `orderingKey` optional in the envelope and set `"orderingKey": false` in the deliver schema (unpublished v1, so in-place), update docs/10:540. Binding until decided (README D-06): the deliver command carries `orderingKey` = webhook endpoint ID per its machine schema, the relay passes it unchanged, and the dispatcher subscription is unordered; P00 checks only `aggregateId === data.deliveryId` and fixtures use `orderingKey = endpointId`. | P09 delivery publication (not P00) |
-| R-02 | `docs/05-API_AND_IDEMPOTENCY_CONTRACT.md:314-353` timeline example lacks required `truncated` (`openapi/openapi.yaml:1241-1245`). | Prose-example validation cannot be fully green. | Low | Contract fix: add `"truncated": false` to the docs/05 example. P00-T09 records it as `knownDeviation` asserting it is the *only* error; remove the entry when fixed. | none |
+| R-02 | **Resolved before P00** by D-08 fix 2: `docs/05` §Retrieve a payment timeline now includes the required `truncated` (`openapi/openapi.yaml` `PaymentTimeline.required`). | — | Closed | No action. P00-T09 validates all prose examples with no `knownDeviation` entry and must not add one. | none |
 | R-03 | `openapi/openapi.yaml:1300-1306` says timeline `detail` per-kind shapes "are enumerated in docs/05", but `docs/05:357` only states "closed per-kind object" without listing shapes. | P04 cannot write per-kind validators from the contract. | Medium | Contract owner enumerates per-kind `detail` shapes before P04 timeline work. | P04 (timeline) |
 | R-04 | Ajv `strict: true` fails on the checked-in schemas (strictTypes/strictRequired). | A naive "strict" configuration blocks CI. | Medium | Use the binding option set in P00-T08 (`strictSchema: true`, others off) — satisfies `schemas/README.md:21-31`, which only requires unknown keywords to be errors. Verified during planning. | none |
 | R-05 | `docs/09-TEST_AND_PERFORMANCE_PLAN.md:85` requires lint rules forbidding `number` in money types; CONVENTIONS §5 (line 139) says an ESLint rule is not feasible. | Ambiguous enforcement. | Low | P00-T02 adds a narrow, feasible rule scoped to `packages/domain/src/money.ts` and `fees.ts`; reviewer grep stays for other money paths. | none |
