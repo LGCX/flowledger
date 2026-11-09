@@ -167,7 +167,7 @@ Tests run against the supported PostgreSQL major version, not an in-memory subst
 - Refunds that collectively fit are all accepted concurrently; the reserved total and unresolved count stay consistent with the operation rows under every interleaving, enforced by the deferred constraint trigger.
 - An exclusive command and a refund cannot both be unresolved for one payment.
 - A direct attempt to desynchronize the reservation fields, or to set a refund's fee effect at acceptance, fails at the database boundary.
-- A fee policy whose fixed component exceeds its declared minimum capture amount cannot be inserted, and a capture below that minimum is rejected before any row commits.
+- A fee policy whose fee at its declared minimum capture amount exceeds that minimum cannot be inserted — which also excludes one whose fixed component exceeds its minimum, because the fee always includes that component — and a capture below that minimum is rejected before any row commits.
 - Account locks are acquired in canonical order and safe retries survive deadlock/serialization errors, including when two postings contend on the same platform bucket.
 - Every striped logical account has a contiguous, complete bucket set, and a posting retry resolves to the same bucket.
 - Settlement: concurrent runs for one merchant produce at most one batch; batch and membership rows reject update and delete; a zero or negative net posts and settles nothing.

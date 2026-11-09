@@ -263,9 +263,10 @@ Adding 5000 before integer division implements `HALF_UP` rounding of the percent
 
 A fee policy with a fixed component `K` cannot produce a valid fee for a capture smaller than `K`. Treating that as a runtime monetary conflict would make small captures permanently impossible while reporting a state error, so the boundary is declared in the policy instead.
 
-- Every fee policy declares `minimum_capture_amount_minor`, validated at policy insertion to be at least `K` and at least 1.
+- Every fee policy declares `minimum_capture_amount_minor`, validated at policy insertion to be at least `K`, at least 1, and high enough to price itself: insertion MUST reject a policy unless `floor((minimum_capture_amount_minor * B + 5000) / 10000) + K <= minimum_capture_amount_minor`.
+- The last condition is not implied by the first two. A policy with `B = 5000`, `K = 30`, and a declared minimum of 30 admits a capture of 40, whose percentage component is `floor((40 * 5000 + 5000) / 10000) = 20` and whose fee is therefore 50 — greater than the gross — because the fixed component is charged in full against a small percentage base.
 - A capture command whose amount is below the policy minimum is rejected at acceptance with `422 CAPTURE_BELOW_MINIMUM`, naming the minimum. No operation, idempotency result, outbox row, or provider attempt is created.
-- With that boundary enforced, `F <= G` holds for every accepted capture by construction. The posting function still asserts `0 <= F <= G` as a protected invariant; a violation there is an internal invariant breach, not a client error, and it never silently caps the fee.
+- With both checks enforced, `F <= G` holds for every accepted capture by construction. `F(G) - G` is non-increasing across the whole `B <= 10000` domain, because the percentage component rises by at most one minor unit per minor unit of gross; satisfying the bound at the minimum therefore satisfies it at every amount the policy accepts. The posting function still asserts `0 <= F <= G` as a protected invariant; a violation there is an internal invariant breach, not a client error, and it never silently caps the fee.
 
 The capture operation snapshots `B`, `K`, the capture rounding mode, the refund fee mode, the exact `F`, and the capture gross `G`. Reconciliation uses that immutable snapshot and never the current fee policy.
 

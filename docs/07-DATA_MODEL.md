@@ -293,7 +293,7 @@ Fee-policy rows are immutable versions. Editing a fee creates a new row; existin
 | `currency` | `text` | No | `USD` |
 | `basis_points` | `integer` | No | `0..10000` |
 | `fixed_amount_minor` | `bigint` | No | `0..1000000000000` |
-| `minimum_capture_amount_minor` | `bigint` | No | Smallest capture this policy can price; at least `fixed_amount_minor` and at least 1 |
+| `minimum_capture_amount_minor` | `bigint` | No | Smallest capture this policy can price; at least `fixed_amount_minor`, at least 1, and large enough that the fee charged at it does not exceed it (see `fee_policies_fee_within_minimum`) |
 | `capture_rounding_mode` | `text` | No | `HALF_UP` for MVP; applies to the capture percentage component only |
 | `refund_fee_mode` | `text` | No | `PROPORTIONAL` for the MVP |
 | `effective_from` | `timestamptz` | No | Inclusive |
@@ -307,14 +307,15 @@ Constraints and indexes:
 - One current policy per merchant/currency: unique partial index on `(merchant_id, currency) WHERE superseded_at IS NULL`.
 - `CHECK (basis_points BETWEEN 0 AND 10000)`.
 - `CHECK (fixed_amount_minor BETWEEN 0 AND 1000000000000)`.
-- `CHECK (minimum_capture_amount_minor >= GREATEST(fixed_amount_minor, 1))`. This is the structural guarantee that an accepted capture can always be priced: a policy whose fixed component exceeds its declared minimum capture cannot be inserted.
+- `CHECK (minimum_capture_amount_minor >= GREATEST(fixed_amount_minor, 1))`.
+- `CONSTRAINT fee_policies_fee_within_minimum CHECK ((minimum_capture_amount_minor * basis_points + 5000) / 10000 + fixed_amount_minor <= minimum_capture_amount_minor)`. This is the structural guarantee that an accepted capture can always be priced: a policy must declare a minimum high enough to cover the fee it charges at that minimum. `bigint` division truncates, which is the intended floor for these non-negative operands, and the intermediate product is at most `10^16`, inside `bigint` range. The preceding check does not imply this one: `basis_points = 5000`, `fixed_amount_minor = 30`, minimum 30 admits a capture of 40 whose fee is 50.
 - `CHECK (capture_rounding_mode = 'HALF_UP')`. The column name states its scope: it governs the capture percentage component only. Refund reversal is defined by the cumulative floor rule below and does not consult it.
 - `CHECK (refund_fee_mode = 'PROPORTIONAL')`. Refund fee uses the exact cumulative contract `targetFeeReversed(R)=floor(F*R/G)` and `incremental=target(R1)-target(R0)` from the ledger contract, evaluated at refund **confirmation** from confirmed cumulative refunds. Fractional-minor-unit residual is assigned to later confirmations, and a full cumulative refund reverses the full captured fee exactly regardless of confirmation order.
 - The entire row is immutable except setting `superseded_at` once. A trigger rejects clearing or changing it afterward.
 
 The fee formula is exactly `percentage_fee=floor((gross*basis_points+5000)/10000)` and `capture_fee=percentage_fee+fixed_amount_minor`, using checked wide-integer arithmetic as defined by the ledger contract.
 
-The guarded acceptance function rejects a capture amount below `minimum_capture_amount_minor` as `422 CAPTURE_BELOW_MINIMUM` before inserting an operation. Because the policy check guarantees `minimum_capture_amount_minor >= fixed_amount_minor`, `capture_fee <= gross` holds for every accepted capture by construction. The function still asserts `0 <= capture_fee <= gross` as a protected invariant; a violation there is an internal invariant breach rather than a client error, and the fee is never silently capped.
+The guarded acceptance function rejects a capture amount below `minimum_capture_amount_minor` as `422 CAPTURE_BELOW_MINIMUM` before inserting an operation. `fee_policies_fee_within_minimum` proves the fee charged at the policy minimum does not exceed that minimum, and `capture_fee - gross` is non-increasing over the whole `basis_points <= 10000` domain, so `capture_fee <= gross` holds for every capture at or above the minimum. The function still asserts `0 <= capture_fee <= gross` as a protected invariant; a violation there is an internal invariant breach rather than a client error, and the fee is never silently capped.
 
 The capture operation snapshots the inputs, the exact fee result, and the capture gross. Reconciliation never recalculates from the currently active fee policy.
 
@@ -1482,7 +1483,7 @@ The database model is accepted only when integration tests prove:
 - `reserved_refund_amount_minor` and `unresolved_refund_count` always equal the sum and count over unresolved refund rows; a direct attempt to desynchronize them fails at commit.
 - A rejected or failed refund releases its reservation and consumes no fee reversal; an `UNKNOWN` refund keeps its reservation while later refunds against the remaining amount are still accepted.
 - An exclusive command is rejected while any refund is unresolved, and a refund is rejected while any exclusive operation is unresolved.
-- A capture below the bound policy's `minimum_capture_amount_minor` is rejected before any operation, idempotency, or outbox row exists; a fee policy whose fixed component exceeds its declared minimum cannot be inserted.
+- A capture below the bound policy's `minimum_capture_amount_minor` is rejected before any operation, idempotency, or outbox row exists; a fee policy whose fixed component exceeds its declared minimum cannot be inserted, and neither can one whose fee at its declared minimum exceeds that minimum (`fee_policies_fee_within_minimum`).
 - A refund's `fee_effect_amount_minor` is null until its terminal transition, nonnull only on success, and immutable afterward.
 - Confirming the same refund set in different orders reverses the same total fee, with any single allocation differing by at most one minor unit.
 - Every striped logical account has exactly `bucket_count` rows numbered contiguously from zero, and a physical `code` always agrees with its `logical_code` and `bucket_index`.
