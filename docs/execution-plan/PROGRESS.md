@@ -1859,7 +1859,49 @@ Two test-harness lessons recorded rather than papered over: a claim lost to the 
 as SQLSTATE `P0001` unless it is mapped (the fixture now maps it), and inserting an operation in a
 fixture must re-sync the payment, or the P02-T10 trigger fires.
 
-**Next task:** `P02-T12`.
+## P02-T12 — Migration 0280: messaging tables and message-type registry
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P02-T13.
+
+```text
+TASK P02-T12 — NEEDS-REVIEW
+Acceptance criteria:
+  - messaging.message_types equals schemas/registry.v1.json (26 rows) and each aggregate_type equals
+    the referenced schema's aggregateType const -> met
+  - every named constraint/index has a negative test across all five tables -> met
+    (assertConstraintCoverage: 6 + 11 + 6 + 14 + 6)
+  - outbox identity/content columns cannot change and cannot diverge from the envelope; the hot
+    envelope clears only with an archive reference after publication -> met, proven twice
+    (guard -> IMMUTABLE_FIELD; guard disabled -> 23514 outbox_messages_envelope_derivation)
+  - inbox and replay rows are insert-only; DLQ identity fields immutable; DLQ subjects tenant-safe ->
+    met, including a foreign payment -> dead_letter_records_payment_fkey
+  - every runtime role gets 42501 on all five tables -> met (catalog matrix + one executed probe/role)
+Tests added: test/integration/db/messaging-tables.test.ts (46)
+  break-and-restore (each observed failing, then restored) — all three bit:
+    one registry row removed (handoff)              -> parity + 3 dependent cases fail
+    derivation proof disabled                       -> 4 derivation cases fail
+    outbox immutable-column list reduced to 'kind'  -> the identity-column case fails
+    baseline after restore                          -> 46 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 331, e2e 0
+Deviations from the task text:
+  1. The privileges test asserts the full 12-role x 5-table x 5-privilege matrix from the catalog
+     (has_table_privilege) and confirms it with one executed 42501 per role. Executing all 300
+     statements was measured first and is equivalent but ~2 minutes slower.
+  2. TRUNCATE on messaging.message_types is refused by the outbox FK (0A000) before the guard triggers,
+     so that case asserts 0A000 — the earlier, stronger refusal.
+Contract/plan issues found: none.
+Next task: P02-T13.
+```
+
+Two findings worth recording. The `fl_reject_mutation` guard on `message_types` cannot be reached by
+TRUNCATE because the outbox FK refuses first, so the trigger there is defence in depth rather than the
+active guard.
+
+My own fixture passed `pool.connect()` (a Promise) where a client was expected and never released it;
+the test file's 46 cases passed while the fixture teardown hung for the full 120 s timeout. It is worth
+treating a passing suite with a timing-out `afterAll` as a failure, not a pass.
+
+**Next task:** `P02-T13`.
 
 
 
