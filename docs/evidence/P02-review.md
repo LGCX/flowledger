@@ -119,9 +119,13 @@ minimum = 0`: `(0·bp + 5000)/10000 + 0 ≤ 0` is true. I dropped the constraint
   Covered now, plus "CANCELED without a succeeded CANCEL".
 - **No catalog guard.** The 0280 `message_types` defect (RLS on, no policy for the role granted SELECT)
   was invisible to that table's own tests. `test/integration/db/catalog.test.ts` asserts across every
-  application schema: each role granted a privilege on an RLS table has a policy; RLS is enabled
-  everywhere; every function whose body is resolved at run time pins `search_path`; only the three pure
-  predicates are PUBLIC-executable. Dropping 0290's policy fails it.
+  application schema: each role granted a privilege on an RLS table has a policy; every function whose
+  body is resolved at run time pins `search_path` to trusted schemas (never `"$user"`); no role but the
+  owner can CREATE in `public` or an application schema, which is what makes a pinned path safe; only
+  the three pure predicates are PUBLIC-executable. _Narrowed before P03-T01:_ the first version also
+  required RLS on every table and the exact string `pg_catalog, pg_temp`. Neither is a contract rule
+  (docs/07 puts RLS on tenant data; the P03 plan uses `search_path = pg_catalog`), and both would have
+  blocked P03, so they were removed (commit `test(db): scope the catalog checks to contract rules`). Dropping 0290's policy fails it.
 
 ### 7. A FAILED authorization was recorded as DECLINED — `79b0f30`
 
