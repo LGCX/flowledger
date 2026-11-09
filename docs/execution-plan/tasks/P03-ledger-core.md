@@ -126,7 +126,7 @@ TypeScript:
      RETURN mod(v, p_bucket_count)::smallint;
    END $$;
    ```
-4. Ownership and grants (last in the file): `ALTER FUNCTION ... OWNER TO ledger_function_owner` for all three; `REVOKE ALL ON FUNCTION ... FROM PUBLIC` for all three; `GRANT EXECUTE ON FUNCTION ledger.bucket_for_payment(text, integer) TO fl_operator_readonly, payments_function_owner, settlement_function_owner, fl_migration_owner`; `GRANT EXECUTE ON FUNCTION ledger.generate_id(text), ledger.jcs(jsonb) TO fl_migration_owner`.
+4. Ownership and grants (last in the file), in this order — the P02 pattern (`0220`, `0270`, `0290`): `GRANT USAGE ON SCHEMA ledger TO fl_operator_readonly, payments_function_owner, settlement_function_owner, ledger_function_owner` (no earlier migration grants any role USAGE on `ledger`, so without it every EXECUTE below is inert); `REVOKE ALL ON FUNCTION ... FROM PUBLIC` for all three; `GRANT EXECUTE ON FUNCTION ledger.bucket_for_payment(text, integer) TO fl_operator_readonly, payments_function_owner, settlement_function_owner, fl_migration_owner`; `GRANT EXECUTE ON FUNCTION ledger.generate_id(text), ledger.jcs(jsonb) TO fl_migration_owner`; then, last, `SELECT public.fl_assign_function_owner('<signature>'::regprocedure, 'ledger_function_owner')` for all three. **Not** a bare `ALTER FUNCTION ... OWNER TO`: `fl_migration_owner` holds the owner roles with `INHERIT FALSE`, and the new owner needs momentary `CREATE` on the schema, which is exactly what `fl_assign_function_owner` grants and revokes. Grants come before the ownership change because only the owner can grant. [P02-REVIEW plan correction]
 
 **Expected behavior** — Golden vectors (bucket = `ledger.bucket_for_payment(id, N)`):
 
@@ -153,7 +153,7 @@ The N=7 column exists so an implementation that only reads the last character (c
 **Testing requirements** — `test/integration/ledger/helpers.test.ts` (default fixture):
 - golden vector table above (positive); two separate pool connections compute the same bucket for 200 random generated `pay_` IDs (stability across sessions); a fast-check property comparing SQL with a test-local `BigInt` reference decoder for 500 random valid IDs and N ∈ {1, 7, 32, 100}.
 - negative: invalid ID, `N=0`, `N=101`; `SET ROLE fl_api; SELECT ledger.bucket_for_payment(...)` fails with SQLSTATE `42501`.
-- jcs: key ordering (`"B"` sorts before `"a"`), nested arrays, control-character escape, `1.5`, `1e3`, `2^53` rejection, non-ASCII key rejection.
+- jcs: key ordering (`"B"` sorts before `"a"`), nested arrays, control-character escape, `1.5`, `1.0`, `2^53` rejection, non-ASCII key rejection; `'1e3'::jsonb` emits `1000`. [P02-REVIEW ruling: the argument is `jsonb`, which normalizes `1e3` to `1000` at cast time, before `jcs` runs, so it cannot be rejected and need not be — TypeScript `canonicalJson(JSON.parse('1e3'))` is also `1000`. `1.0` is different: `jsonb` keeps its scale and prints `1.0` while TypeScript prints `1`, so `jcs` must reject it (`JCS_UNSUPPORTED_NUMBER`) or SQL and TS hashes would diverge. Keep the signature `ledger.jcs(jsonb)`.]
 - Command: `pnpm vitest run --project integration test/integration/ledger/helpers.test.ts`.
 
 **Non-goals** — No tables. No TypeScript bucket function (the bucket is derived only in the database, docs/07). No posting hash yet (T05).
