@@ -384,6 +384,43 @@ should sequence build-then-install (or invoke `node apps/cli/dist/index.js`).
 Next task: P00-T06 (dependencies satisfied: yes — P00-T04).
 ```
 
-**Next task:** `P00-T06`, after owner approval.
+## P00-T06 — Docker stack, simulator DB bootstrap, PostgreSQL fixture
+
+**Status:** `NEEDS-REVIEW` — all gates green including the integration lane; proceeding to
+P00-T07 under the owner's standing instruction to test-then-commit without asking.
+
+```text
+TASK P00-T06 — NEEDS-REVIEW
+Commit: da5b33a on task/p00-t06-docker-postgres
+Acceptance criteria:
+  - docker compose config validates -> met
+  - image tags exact and recorded in docs/VERSIONS.md -> met
+    (postgres:17.11, cloud-cli:592.0.0-emulators, jaeger 1.76.0)
+  - integration test proves role isolation -> met (7 cases)
+  - server_version_num between 170000 and 179999 -> met
+Tests added: test/integration/simulator-db-bootstrap.test.ts :: 7 cases
+  break-and-restore (each observed failing, then restored):
+    truth granted INSERT + read-only default dropped -> cannot-insert fails
+    PUBLIC keeps CONNECT on flowledger_sim           -> PUBLIC test fails
+    ALTER DEFAULT PRIVILEGES removed                 -> read-access test fails
+    testkit pins postgres:16.11                      -> version + image tests fail
+    baseline after restore                           -> 7 passing
+Commands: docker compose config -> valid | pnpm check -> 0
+          pnpm test:integration -> 0 | pnpm test:e2e -> 0 | pnpm build -> 0
+          clean clone: install 0, check 0, integration 0, compose config valid,
+          init script executable in git (100755)
+          live: pnpm db:up -> all 3 healthy; pnpm db:down -> containers/network/volume removed
+Deviations from the task text: the init script uses two psql invocations instead of one
+heredoc with `\connect` (the second needs no password variables). Same SQL and order.
+Contract/plan issues found: none.
+Next task: P00-T07.
+```
+
+**Environment note:** this session started with the Docker daemon down; `open -a Docker`
+brought Docker Desktop 28.1.1 up, so the integration lane is genuinely verified here
+rather than reported as unverifiable.
+
+**Next task:** `P00-T07`.
+
 
 
