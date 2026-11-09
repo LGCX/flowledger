@@ -161,4 +161,52 @@ pnpm 10.34.9 from `packageManager`. Nothing on the host was modified. On a norma
 machine `nvm install && corepack enable` reproduces this exactly; `.nvmrc` and
 `engines.node` pin it either way.
 
-**Next task:** `P00-T02`, after owner approval.
+## P00-T02 — ESLint policy rules and dependency-policy check
+
+**Status:** `NEEDS-REVIEW` — all gates green, awaiting owner approval before P00-T03.
+
+```text
+TASK P00-T02 — NEEDS-REVIEW
+Commit: cbd19da on task/p00-t02-lint-policy
+Acceptance criteria:
+  - every boundary row errors on one forbidden import, silent on one allowed -> met
+    (16 cases: boundary/<pkg>/forbidden + /allowed for all 8 packages)
+  - both simulator variables rejected outside their allowed dirs, accepted inside -> met
+    (SIMULATOR_DATABASE_URL: rejected in providers/payment-worker incl. bracket access,
+    accepted in testkit/cli/test; PROVIDER_SIMULATOR_DATABASE_URL: rejected in api,
+    accepted in provider-simulator)
+  - money and ledger-DML rules fire on positives, silent on controls -> met
+  - dependency-policy test fails on a mutated in-memory manifest -> met (checker is
+    exported; negative cases feed objects, never files)
+  - pnpm check green -> met
+Tests added: test/contract/lint-rules.test.ts :: 42 cases
+             test/contract/dependency-policy.test.ts :: 10 cases
+  break-and-restore (each observed failing, then restored):
+    boundary configs removed            -> 10 failed
+    simulator selectors removed         ->  5 failed
+    money selectors removed             ->  5 failed
+    ledger selectors removed            ->  5 failed
+    exact-version check disabled        ->  2 failed
+    checker returns no findings         ->  5 failed
+    baseline after restore              -> 42 and 10 passing
+Commands: pnpm check -> 0 (52 contract tests) | pnpm test:integration -> 0
+          pnpm test:e2e -> 0 | eslint . -> 0
+          clean clone: install --frozen-lockfile 0, check 0
+Deviations from the task text:
+  1. Steps 2-4 describe four separate `no-restricted-syntax` config objects. A file
+     such as packages/domain/src/money.ts matches four of them, and flat config
+     replaces the rule wholesale on the last match, so following the steps literally
+     would drop the ledger and simulator rules in money.ts. Each config now carries a
+     complete selector set for the files it matches; two regression cases pin it
+     (money/ledger-rule-still-applies-in-money-file,
+     money/simulator-rule-still-applies-in-money-file).
+  2. approved-dependencies.json adds `approvedPatterns` because CONVENTIONS §2 names
+     "OTLP exporters" as a family, not packages. Encoded as
+     ["@opentelemetry/exporter-"] instead of inventing concrete exporter names.
+Contract/plan issues found: none. (docs/09:85 asks for "no number in money-domain
+types" without naming files; the task narrows it to money.ts/fees.ts per R-05, which
+is followed.)
+Next task: P00-T03 (dependencies satisfied: yes — P00-T01).
+```
+
+**Next task:** `P00-T03`, after owner approval.
