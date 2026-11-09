@@ -2119,3 +2119,11 @@ Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 418, e2e
   test:integration x3 = 418/418 each; idempotency.test.ts 8/8; property tests at seeds 1, 42, 777,
   20261108 x 500 runs.
 ```
+
+Merged to `main` by fast-forward (through `e418228`, which also makes the two P02 migration-list tests
+read `migrations/` from disk so P03's `0300_*` files do not turn them red). Owner rulings still open:
+expired-key reuse with changed input (docs/05 vs docs/07, affects P04-T03/T07); P05-T10 dead-letter
+hash form; `api` function owner (CONVENTIONS §7); DLQ failure classes (R16); P10 "fee 300" example vs
+0293. None blocks P03.
+
+**Next task:** `P03-T01`.
