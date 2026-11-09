@@ -30,6 +30,12 @@ paths = [
 # also covers identifiers added later. A credential that happened to be shaped exactly like an
 # entity ULID or a UUID would be missed; that is the accepted trade, and it is recorded here.
 regexes = [
+  # The constant placeholder locator `0123456789AB` used by the credential golden vector and by the
+  # format-rejection cases (P02-T04). It is a fixed synthetic value, not a shape: a *real* credential
+  # would carry a random locator, so `fl_test_<random>_<random>` is still scanned. Allowlisting the
+  # whole `fl_test_*` shape was rejected for exactly that reason — it would blind the scan to a leaked
+  # merchant credential, which is the case this file exists to catch.
+  '''0123456789AB''',
   # Entity ID: `pay_`, `op_`, `mer_`, `cor_`, … — prefix, underscore, Crockford base32, first char 0-7.
   '''[a-z][a-z0-9]{1,15}_[0-7][0-9A-HJKMNP-TV-Z]{25}''',
   # Envelope UUID (the canonical example id used throughout the contracts).
