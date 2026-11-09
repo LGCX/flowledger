@@ -1058,7 +1058,38 @@ the hex of the hex: `hashOf` already returned hex and I applied `toHex` twice. T
 assertion on the wrong error code for a non-canonicalisable body. Both were in the test; the
 implementation reproduced all eight digests on its first run.
 
-**Next task:** `P01-T06`.
+## P01-T06 — Canonical ledger posting hash
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T07.
+
+```text
+TASK P01-T06 — NEEDS-REVIEW
+Acceptance criteria:
+  - all golden rows (positive and negative) asserted from posting-hash.v1.json -> met, 7 positive
+    and 4 negative; each count asserted so a truncated file fails
+  - property: shuffling and splitting lines never changes the hash -> met
+  - property: changing exactly one field changes the hash -> met
+  - canonical text reproduced byte-for-byte -> met; the `capture` text is identical to the plan's
+    block, and all 7 digests were re-derived with Python hashlib independently of the implementation
+Tests added: posting-hash.test.ts (23), golden/posting-hash.v1.json
+  break-and-restore (each observed failing, then restored):
+    duplicate combination removed (handoff item) -> capture-split-lines and the identity property fail
+    sort removed                                 -> three golden hashes fail
+    DEBIT/CREDIT tie order reversed              -> the tie-order case fails
+    balance check removed                        -> the unbalanced negative fails
+    two-account check removed                    -> the one-account negative fails
+    baseline after restore                       -> 23 passing
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text:
+  1. The plan's `binary order uses code units` case compares `lac_0…` with `lac_A…`, but `lac_A…`
+     cannot exist: the first body character is the `[0-7]` overflow bound. The test now compares
+     `lac_0…` with `lac_7…` and adds a case proving `lac_A…` is rejected. The plan's intent still
+     holds — it is the alphabet, not the collation, that makes plain comparison equal `COLLATE "C"`.
+Contract/plan issues found: the ordering example above is not constructible under the ID contract.
+Next task: P01-T07.
+```
+
+**Next task:** `P01-T07`.
 
 
 

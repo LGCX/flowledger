@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "description": "Canonical ledger posting-hash vectors from docs/02 \u00a7Idempotent posting and docs/07 normalization. 'canonicalJson' is the exact UTF-8 text hashed and must be reproduced byte-for-byte by the P03 PL/pgSQL routine; 'sha256' is its lowercase hex digest. Rows with 'expectError' must fail with that DomainError reason.",
+  "vectors": [
+    {
+      "id": "capture",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "CREDIT",
+          "amountMinor": "300"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "10000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"10000\",\"ordinal\":1,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9700\",\"ordinal\":2,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"300\",\"ordinal\":3,\"side\":\"CREDIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"CAPTURE\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":\"op_01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":null}",
+      "sha256": "6ebffec82e65ce367bb31d04556277cab26cd878c36908d45f43ffe5e6200d13"
+    },
+    {
+      "id": "capture-reordered",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "CREDIT",
+          "amountMinor": "300"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "10000"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"10000\",\"ordinal\":1,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9700\",\"ordinal\":2,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"300\",\"ordinal\":3,\"side\":\"CREDIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"CAPTURE\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":\"op_01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":null}",
+      "sha256": "6ebffec82e65ce367bb31d04556277cab26cd878c36908d45f43ffe5e6200d13"
+    },
+    {
+      "id": "capture-split-lines",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "4000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "6000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "CREDIT",
+          "amountMinor": "300"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"10000\",\"ordinal\":1,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9700\",\"ordinal\":2,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"300\",\"ordinal\":3,\"side\":\"CREDIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"CAPTURE\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":\"op_01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":null}",
+      "sha256": "6ebffec82e65ce367bb31d04556277cab26cd878c36908d45f43ffe5e6200d13"
+    },
+    {
+      "id": "capture-amount-changed",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "10000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9699"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "CREDIT",
+          "amountMinor": "301"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"10000\",\"ordinal\":1,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9699\",\"ordinal\":2,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"301\",\"ordinal\":3,\"side\":\"CREDIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"CAPTURE\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":\"op_01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":null}",
+      "sha256": "f451740380cf393468e508eea8839c8703f020df41282a6880b88a7bab6c623f"
+    },
+    {
+      "id": "refund",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "REFUND",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAY",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "DEBIT",
+          "amountMinor": "4850"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "DEBIT",
+          "amountMinor": "150"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "CREDIT",
+          "amountMinor": "5000"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"5000\",\"ordinal\":1,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"4850\",\"ordinal\":2,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"150\",\"ordinal\":3,\"side\":\"DEBIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"REFUND\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":\"op_01ARZ3NDEKTSV4RRFFQ69G5FAY\",\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":null}",
+      "sha256": "628c63f25cd9fa1e203e2a5a5c6a5f1df5943385a314c59d0b0234bfd0055d4a"
+    },
+    {
+      "id": "settlement",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "SETTLEMENT",
+      "paymentId": null,
+      "paymentOperationId": null,
+      "reversalOfTransactionId": null,
+      "settlementBatchId": "sbt_01ARZ3NDEKTSV4RRFFQ69G5FB5",
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "DEBIT",
+          "amountMinor": "9700"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB4",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9700\",\"ordinal\":1,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB4\",\"amountMinor\":\"9700\",\"ordinal\":2,\"side\":\"CREDIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"SETTLEMENT\",\"paymentId\":null,\"paymentOperationId\":null,\"recipeVersion\":1,\"reversalOfTransactionId\":null,\"settlementBatchId\":\"sbt_01ARZ3NDEKTSV4RRFFQ69G5FB5\"}",
+      "sha256": "4d0de279c46d5eda090a9af9a0b480ce44151e954f00cebcbcde8a84c1981e94"
+    },
+    {
+      "id": "reversal",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "REVERSAL",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": null,
+      "reversalOfTransactionId": "ltx_01ARZ3NDEKTSV4RRFFQ69G5FA0",
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "CREDIT",
+          "amountMinor": "10000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "DEBIT",
+          "amountMinor": "9700"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "DEBIT",
+          "amountMinor": "300"
+        }
+      ],
+      "canonicalJson": "{\"currency\":\"USD\",\"entries\":[{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB1\",\"amountMinor\":\"10000\",\"ordinal\":1,\"side\":\"CREDIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB2\",\"amountMinor\":\"9700\",\"ordinal\":2,\"side\":\"DEBIT\"},{\"accountId\":\"lac_01ARZ3NDEKTSV4RRFFQ69G5FB3\",\"amountMinor\":\"300\",\"ordinal\":3,\"side\":\"DEBIT\"}],\"hashVersion\":1,\"ledgerId\":\"led_01ARZ3NDEKTSV4RRFFQ69G5FB0\",\"merchantId\":\"mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ\",\"operationType\":\"REVERSAL\",\"paymentId\":\"pay_01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"paymentOperationId\":null,\"recipeVersion\":1,\"reversalOfTransactionId\":\"ltx_01ARZ3NDEKTSV4RRFFQ69G5FA0\",\"settlementBatchId\":null}",
+      "sha256": "0c547a4b297d62e4b75c80cdc646a28a12b4e5c5c5efdb3bed313c1aefd10864"
+    }
+  ],
+  "negativeVectors": [
+    {
+      "id": "unbalanced",
+      "expectError": "UNBALANCED_POSTING",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "10000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        }
+      ]
+    },
+    {
+      "id": "one-account-only",
+      "expectError": "ENTRIES_INVALID",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "ADJUSTMENT",
+      "paymentId": null,
+      "paymentOperationId": null,
+      "reversalOfTransactionId": null,
+      "settlementBatchId": null,
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "1"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "CREDIT",
+          "amountMinor": "1"
+        }
+      ]
+    },
+    {
+      "id": "zero-amount",
+      "expectError": "ENTRIES_INVALID",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "SETTLEMENT",
+      "paymentId": null,
+      "paymentOperationId": null,
+      "reversalOfTransactionId": null,
+      "settlementBatchId": "sbt_01ARZ3NDEKTSV4RRFFQ69G5FB5",
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "DEBIT",
+          "amountMinor": "0"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB4",
+          "side": "CREDIT",
+          "amountMinor": "0"
+        }
+      ]
+    },
+    {
+      "id": "capture-with-batch",
+      "expectError": "REFERENCES_INVALID",
+      "ledgerId": "led_01ARZ3NDEKTSV4RRFFQ69G5FB0",
+      "merchantId": "mer_01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+      "currency": "USD",
+      "recipeVersion": 1,
+      "operationType": "CAPTURE",
+      "paymentId": "pay_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "paymentOperationId": "op_01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "reversalOfTransactionId": null,
+      "settlementBatchId": "sbt_01ARZ3NDEKTSV4RRFFQ69G5FB5",
+      "lines": [
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB1",
+          "side": "DEBIT",
+          "amountMinor": "10000"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB2",
+          "side": "CREDIT",
+          "amountMinor": "9700"
+        },
+        {
+          "accountId": "lac_01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          "side": "CREDIT",
+          "amountMinor": "300"
+        }
+      ]
+    }
+  ]
+}
