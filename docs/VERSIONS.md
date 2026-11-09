@@ -74,6 +74,7 @@ that is not.
 | `pg`                         | 8.23.1         | `packages/testkit`, root (integration)      |
 | `@types/pg`                  | 8.23.1         | `packages/testkit`, root                    |
 | `fast-check`                 | 4.10.2         | `packages/domain` (dev), `packages/testkit` |
+| `ulid`                       | 3.0.2          | `packages/domain`                           |
 
 `@flowledger/config` is a `workspace:*` dependency of every app, and every app is a `workspace:*`
 devDependency of the root so `test/contract/**` can boot it.

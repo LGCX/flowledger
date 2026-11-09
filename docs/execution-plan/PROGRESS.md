@@ -910,7 +910,39 @@ Next task: P01-T02.
 literals. Integer literals such as the 13-digit length bound are allowed, which is why the parser
 can express its bound without `number`.
 
-**Next task:** `P01-T02`.
+## P01-T02 — Branded entity identifiers
+
+**Status:** `NEEDS-REVIEW` — all gates green; proceeding to P01-T03.
+
+```text
+TASK P01-T02 — NEEDS-REVIEW
+Acceptance criteria:
+  - every prefix in entity-ids.v1.schema.json is present in ID_PREFIXES -> met; 21 in the schema,
+    21 in ID_PREFIXES, diff empty in both directions (checked before writing code)
+  - PaymentId where OperationId is required is a compile error -> met, and observed
+  - 10 000 generated IDs per prefix all parse -> met (21 prefixes)
+Tests added: packages/domain/src/ids.test.ts (29)
+  break-and-restore (each observed failing, then restored):
+    brand made optional (EntityId<P> = string & {__idPrefix?: P}) -> typecheck fails: the
+      @ts-expect-error has nothing to suppress
+    @ts-expect-error removed from the assignment  -> typecheck fails on the real assignment
+    pattern accepts any prefix                    -> 3 fail
+    [0-7] overflow bound replaced with the full alphabet -> 1 fail
+    case-insensitive flag added                   -> 2 fail
+    baseline after restore                        -> 29 passing, typecheck 0
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 0, e2e 0
+Deviations from the task text: none.
+Contract/plan issues found: none.
+Next task: P01-T03.
+```
+
+**Note on the type test:** `@ts-expect-error` is genuinely load-bearing here. `test/tsconfig.json`
+includes co-located tests and the root `tsconfig.json` references it, so `pnpm typecheck` fails both
+when the assignment stops being an error (unused directive) and when the directive is removed while
+the error remains. Removing the brand made the first case fire, which is the only evidence that the
+branded types are exclusive rather than merely documented as such.
+
+**Next task:** `P01-T03`.
 
 
 

@@ -11,5 +11,8 @@
   },
   "devDependencies": {
     "fast-check": "4.10.2"
+  },
+  "dependencies": {
+    "ulid": "3.0.2"
   }
 }
