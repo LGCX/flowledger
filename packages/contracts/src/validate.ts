@@ -1,6 +1,7 @@
 import type { Ajv2020 } from 'ajv/dist/2020.js';
 import { createAjv, createMessageAjv, schemaIdForPath } from './ajv.js';
 import { jsonSchemas, registry, type MessageType } from './generated/schemas.js';
+import { checkMerchantWebhookSemantics, checkSemantics } from './semantic.js';
 
 export interface ValidationIssue {
   readonly path: string;
@@ -132,6 +133,20 @@ export function validateMessage(input: unknown): MessageValidationResult {
     return schemaFailure(toIssues(validate.errors));
   }
 
+  // Schema-valid is not consistent: cross-field correlations are checked after the shape.
+  const violations = checkSemantics(input as RegisteredEnvelope);
+  if (violations.length > 0) {
+    return {
+      ok: false,
+      failure: 'SEMANTIC',
+      issues: violations.map((violation) => ({
+        path: violation.path,
+        rule: violation.rule,
+        message: violation.message,
+      })),
+    };
+  }
+
   return { ok: true, message: input as RegisteredEnvelope };
 }
 
@@ -148,6 +163,19 @@ export function validateMerchantWebhookPayload(input: unknown): MerchantWebhookR
     };
   }
   if (!validate(input)) return { ok: false, failure: 'SCHEMA', issues: toIssues(validate.errors) };
+
+  const violations = checkMerchantWebhookSemantics(input as Record<string, unknown>);
+  if (violations.length > 0) {
+    return {
+      ok: false,
+      failure: 'SEMANTIC',
+      issues: violations.map((violation) => ({
+        path: violation.path,
+        rule: violation.rule,
+        message: violation.message,
+      })),
+    };
+  }
   return { ok: true };
 }
 
