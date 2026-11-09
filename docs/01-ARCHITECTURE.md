@@ -234,7 +234,7 @@ While an operation is `UNKNOWN`, conflicting operations are blocked according to
 - Shared platform accounts are striped into deterministic clearing buckets chosen from the payment ID, so capture and refund postings for different payments do not serialize on one balance row. This is the ledger's primary scaling mechanism and the subject of the reference benchmark's before/after comparison. See [ADR-0010](adr/0010-striped-clearing-accounts.md).
 - Settlement serializes per merchant and currency through an in-flight run claim, and reaches balance rows in the same ascending account-ID order, so it cannot deadlock against a payment resolution.
 - There is no global transaction sequence or global lock.
-- Pub/Sub uses payment ID as the ordering key for payment messages, but correctness also checks aggregate versions. Merchant webhook delivery commands carry no ordering key.
+- Pub/Sub uses payment ID as the ordering key for payment messages, but correctness also checks aggregate versions. Merchant webhook delivery commands use the endpoint ID as their ordering key, so deliveries to one endpoint are ordered relative to each other while different endpoints of the same merchant proceed independently.
 - Provider throughput limits are enforced per provider and merchant without holding database locks during network calls.
 
 ## Failure-containment rules

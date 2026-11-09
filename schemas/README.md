@@ -100,7 +100,7 @@ JSON Schema validates shapes and local constraints. The shared message-validatio
 
 - For every payment command/event, `aggregateId === data.paymentId` and `orderingKey === data.paymentId`.
 - For `payment.operation.execute.v1`, `aggregateVersion === data.expectedPaymentVersion`.
-- For `merchant.webhook.deliver.v1`, `aggregateId === data.deliveryId`, and no `orderingKey` is set. Delivery is deliberately unordered so one unresponsive endpoint cannot serialize a merchant's whole notification stream; consumers order by `data.paymentVersion`.
+- For `merchant.webhook.deliver.v1`, `aggregateId === data.deliveryId` and `orderingKey === data.endpointId`. Ordering is per endpoint, so one unresponsive endpoint cannot serialize a merchant's whole notification stream; consumers order the delivered content by `paymentVersion` in the merchant payload.
 - For `ledger.transaction.posted.v1`, `aggregateId === data.ledgerTransactionId`.
 - For `settlement.batch.posted.v1`, `aggregateId === data.settlementBatchId`, `orderingKey === merchantId`, `aggregateVersion === 1`, and `data.postingKey === 'settlement:' + data.settlementBatchId`. A consumer applying payment-style version contiguity to this type is a configuration error, because a batch is immutable and emits exactly one event.
 - For a `SETTLEMENT` ledger posting, `data.settlementBatchId` is non-null while `data.paymentId` and `data.paymentOperationId` are null; for `CAPTURE`/`REFUND` the inverse holds.

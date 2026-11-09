@@ -76,7 +76,7 @@ Envelope rules:
 - Payment commands carry the payment version observed when the command was created. Retries/rescheduling may therefore repeat a command version; event-contiguity logic MUST NOT be applied to commands.
 - Payment messages use payment ID as `orderingKey`.
 - `settlement.batch.posted.v1` uses `aggregateType=settlement_batch`, the batch ID as `aggregateId`, the merchant ID as `orderingKey`, and `aggregateVersion=1`. A settlement batch is immutable and emits exactly one event, so it has no version sequence; consumers MUST NOT apply payment-style contiguity logic to it.
-- `merchant.webhook.deliver.v1` carries no `orderingKey`.
+- `merchant.webhook.deliver.v1` uses the endpoint ID as `orderingKey`, so deliveries to one endpoint are ordered relative to each other while different endpoints of the same merchant are independent. `orderingKey` MUST equal `data.endpointId`.
 - Monetary amounts are unsigned decimal strings in minor units.
 - `correlationId` remains stable across one end-to-end workflow.
 - `causationId` points to the message or API command that directly caused this message.
@@ -99,11 +99,11 @@ Provider identifiers are opaque strings. Merchant-facing webhook payloads use a 
 | --- | --- | --- | --- | --- |
 | `payment.operation.execute.v1` | Payment API/domain | Payment worker | `operationId`, `paymentId`, `provider`, `expectedPaymentVersion` | Payment ID |
 | `payment.operation.reconcile.v1` | Payment worker or stale-operation sweep | Reconciliation worker | `operationId`, `reason`, `notBefore`, `reconciliationAttempt` | Payment ID |
-| `merchant.webhook.deliver.v1` | Domain-event projector | Webhook dispatcher | `deliveryId`, `endpointId`, `domainEventId` | None |
+| `merchant.webhook.deliver.v1` | Domain-event projector | Webhook dispatcher | `deliveryId`, `endpointId`, `domainEventId` | Endpoint ID |
 
 Command payloads contain stable identifiers, not mutable snapshots. The consumer reloads authoritative state before acting.
 
-Merchant webhook delivery deliberately carries **no** ordering key. Keying by endpoint ID would serialize every delivery for one merchant's endpoint behind the slowest one, making a single unresponsive endpoint the throughput limit for that merchant's entire notification stream. Merchants order for themselves using `paymentVersion` in the payload, which is the same mechanism internal consumers use and is more reliable than transport ordering. Delivery remains at-least-once and per-endpoint fairness is enforced by the dispatcher's concurrency controls rather than by broker ordering.
+Merchant webhook delivery is ordered per endpoint: `orderingKey` is the endpoint ID, so deliveries to one endpoint are serialized relative to each other. Different endpoints of the same merchant are never serialized against each other, so one unresponsive endpoint cannot become the throughput limit for that merchant's entire notification stream. Per-endpoint fairness and backpressure are dispatcher concerns. Merchants order the content for themselves using `paymentVersion` in the payload, which is the same mechanism internal consumers use and is more reliable than transport ordering. Delivery remains at-least-once.
 
 ## Initial event catalog
 
@@ -350,7 +350,7 @@ Reconciliation compares provider identity, idempotency key, amount, currency, ex
 - Scan representative messages to prove prohibited data is absent.
 - Verify merchant webhook signature golden vectors, secret-version snapshots, retry classification, timestamp tolerance, no-redirect/SSRF policy, stable delivery IDs/bodies, and endpoint/event deduplication.
 - Prove `payment.created.v1` produces no merchant webhook delivery, and that a merchant webhook payload whose type is outside the allowlist fails validation before a delivery row exists.
-- Prove `merchant.webhook.deliver.v1` is published without an ordering key and that one slow endpoint does not delay deliveries to another endpoint of the same merchant.
+- Prove `merchant.webhook.deliver.v1` is published with the endpoint ID as its ordering key, and that one slow endpoint does not delay deliveries to another endpoint of the same merchant.
 - Validate `settlement.batch.posted.v1` against its schema, prove its aggregate/ordering identity rules, and prove a consumer applying payment-style version contiguity to it is rejected by the semantic correlation validator.
 - Prove the ledger event accepts `SETTLEMENT` as an operation type and that a settlement posting carries no payment or payment-operation reference.
 
@@ -360,5 +360,5 @@ Reconciliation compares provider identity, idempotency key, amount, currency, ex
 - **Schema registry:** JSON Schemas and the type-to-schema registry are checked into this repository. CI validates every fixture and verifies that every cataloged message type is registered. A managed registry is deferred.
 - **Leases:** Worker request deadlines and processing leases are provider capabilities defined in the provider contract. Expiry never authorizes a blind write retry; a stale post-request lease moves the operation to `UNKNOWN` and reconciliation.
 - **Retention:** Published outbox rows remain queryable in PostgreSQL for 30 days, then their immutable envelopes are archived for one year before deletion. Unpublished rows are never age-purged. Inbox deduplication records for financial consumers do not expire in the MVP; later compaction must preserve an immutable envelope-ID tombstone.
-- **Merchant webhook ordering:** Deliveries carry no ordering key. Per-endpoint fairness and backpressure are dispatcher concerns; event order is a consumer concern resolved with `paymentVersion`.
+- **Merchant webhook ordering:** Deliveries use the endpoint ID as their ordering key, so ordering is per endpoint and different endpoints of one merchant are independent. Per-endpoint fairness and backpressure are dispatcher concerns; event order across a merchant's stream is a consumer concern resolved with `paymentVersion`.
 - **Public allowlist scope:** Only outcomes a merchant cannot already know from its own synchronous command are published. `payment.created.v1` and `settlement.batch.posted.v1` are internal-only in the MVP.
