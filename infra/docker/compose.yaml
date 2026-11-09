@@ -13,7 +13,10 @@ services:
       FL_SIMULATOR_PASSWORD: ${FL_SIMULATOR_PASSWORD:-fl_simulator_local_only}
       FL_SIMULATOR_TRUTH_PASSWORD: ${FL_SIMULATOR_TRUTH_PASSWORD:-fl_simulator_truth_local_only}
     ports:
-      - '5432:5432'
+      # Configurable because a local PostgreSQL commonly owns 5432 on a developer machine, and the
+      # published port then silently reaches that server instead of this container. Set
+      # POSTGRES_HOST_PORT=5433 (and the URLs to match) when that happens.
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
     volumes:
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
       - postgres-data:/var/lib/postgresql/data

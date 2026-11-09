@@ -242,6 +242,13 @@ export async function bootstrapDatabase(adminUrl: string, migrationUrl: string):
       await client.query(
         `CREATE DATABASE ${client.escapeIdentifier(databaseName)} OWNER ${MIGRATION_OWNER}`,
       );
+    } else {
+      // The database may already exist owned by someone else — the PostgreSQL image creates
+      // `POSTGRES_DB` as the superuser, which leaves the migration owner unable to create anything in
+      // `public`. Bootstrap's promise is that the owner can use the database, so make that true.
+      await client.query(
+        `ALTER DATABASE ${client.escapeIdentifier(databaseName)} OWNER TO ${MIGRATION_OWNER}`,
+      );
     }
   } finally {
     await client.end();

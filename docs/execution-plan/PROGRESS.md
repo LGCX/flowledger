@@ -2052,3 +2052,32 @@ fixed here: P02-GATE may not modify apps/** or packages/database/**, and a fix i
 Follow-up: resolve the Compose wiring and add the two scripts.
 Next task: P03-T01 (Ledger core, M3).
 ```
+
+## chore — Docker Compose database wiring
+
+**Status:** `DONE` — the Compose walkthrough runs end to end; the P02-GATE open item is closed.
+
+```text
+CHORE — DONE
+Symptom: `db:up` healthy, but `migrate` exited 0 without the schema reaching the Compose database and
+  the seed failed with `relation "identity.merchants" does not exist`.
+Root cause (two, both environmental rather than code defects):
+  1. Port shadowing. A local Homebrew PostgreSQL 14.18 owned 127.0.0.1:5432 and Docker published the
+     same address; macOS resolves localhost to 127.0.0.1, so the CLI reached the LOCAL server. The
+     reported symptom was `syntax error at or near "INHERIT"` in 0200_foundation.sql — valid PG16+
+     syntax rejected by PG14.
+  2. Ownership. The PostgreSQL image creates POSTGRES_DB owned by the superuser, so the migration owner
+     could not create in `public` (`permission denied for schema public`). bootstrapDatabase created the
+     database only when absent.
+Fixes:
+  - compose publishes `${POSTGRES_HOST_PORT:-5432}:5432`
+  - `pnpm db:up` (scripts/db-up.mjs) compares `version()` through the published port with the container's
+    own and refuses to continue on a mismatch, printing the commands to use another port
+  - bootstrapDatabase takes ownership of an existing database (ALTER DATABASE ... OWNER TO)
+  - `db:migrate` and `db:seed` scripts added; docs/DEVELOPMENT.md and .env.example updated
+Verified: clean volume, POSTGRES_HOST_PORT=5433 → db:up (port check passes) → db:migrate --bootstrap
+  (10 applied) → db:migrate (0 applied, 10 skipped) → db:seed (three credential lines) → db:migrate
+  (0 applied, 10 skipped). Shadowing preflight verified failing loudly on port 5432.
+Commands: scripts/verify-task.mjs --full: check 0, build 0, integration 391, e2e 0
+Next task: P03-T01 (Ledger core, M3).
+```

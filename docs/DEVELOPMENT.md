@@ -54,6 +54,8 @@ later phase — it is listed here so nobody assumes it is implemented.
 | `pnpm contracts:check`    | Fail if the committed generated files differ from a fresh generation.                                                             |
 | `pnpm db:up`              | Start Postgres, the Pub/Sub emulator, and Jaeger, and wait for health.                                                            |
 | `pnpm db:down`            | Stop them and remove the volumes.                                                                                                 |
+| `pnpm db:migrate`         | Apply pending migrations as `fl_migration_owner` (add `--bootstrap` once per fresh volume).                                       |
+| `pnpm db:seed`            | Load the dev seed and print the synthetic credentials once.                                                                       |
 | `pnpm verify:task`        | The task gate: refuses to run on `main`, then runs `pnpm check` and `pnpm build`. Add `--full` for the integration and e2e lanes. |
 
 ### Running one test file
@@ -116,3 +118,25 @@ chmod +x .git/hooks/pre-commit
 
 CI re-runs the same script content through the `fast` and `integration` jobs, which is the
 enforcement that applies to everyone rather than to one clone.
+
+## A local PostgreSQL already on 5432
+
+`pnpm db:up` publishes the container on `POSTGRES_HOST_PORT` (default 5432). If a local PostgreSQL is
+already listening there, macOS resolves `localhost` to `127.0.0.1` and the CLI reaches _that_ server
+instead of the container — so migrations run against a database nobody intended, often failing with
+syntax errors in SQL that is perfectly valid (an older server rejecting PG16+ `GRANT ... WITH INHERIT`).
+
+`pnpm db:up` now compares the `version()` reported through the published port with the one the container
+reports and refuses to continue when they differ, printing the commands to use another port:
+
+```bash
+POSTGRES_HOST_PORT=5433 pnpm db:up
+MIGRATION_DATABASE_URL=postgres://fl_migration_owner:fl_local_owner_password@localhost:5433/flowledger \
+DATABASE_ADMIN_URL=postgres://postgres:flowledger_local_only@localhost:5433/postgres \
+pnpm db:migrate --bootstrap
+pnpm db:migrate
+pnpm db:seed
+```
+
+`db:migrate --bootstrap` is needed once per fresh volume: it creates `fl_migration_owner` and takes
+ownership of the database, which the PostgreSQL image otherwise leaves with the superuser.
