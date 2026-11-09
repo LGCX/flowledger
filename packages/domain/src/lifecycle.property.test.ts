@@ -23,7 +23,12 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { acceptCommand } from './commands.js';
-import { type FeePolicyInputs, type FeeSnapshot, computeCaptureFee } from './fees.js';
+import {
+  type FeePolicyInputs,
+  type FeeSnapshot,
+  checkFeePolicy,
+  computeCaptureFee,
+} from './fees.js';
 import type { OperationId, PaymentId } from './ids.js';
 import { type MinorUnits, minorUnits } from './money.js';
 import {
@@ -79,11 +84,22 @@ function freshId(): OperationId {
   return `op_01ARZ3NDEKTSV4RRFFQ69G5F${a}${b}` as OperationId;
 }
 
+/**
+ * Capture and refund amounts are generated relative to the state they act on (`permille` of the
+ * authorized or refundable amount, up to 110 % so over-limit requests stay common). Absolute random
+ * amounts almost never fit a payment, which is part of why the original walk never captured.
+ */
 type Action =
   | { readonly kind: 'ACCEPT_AUTHORIZE' }
-  | { readonly kind: 'ACCEPT_CAPTURE'; readonly amount: bigint }
+  | { readonly kind: 'ACCEPT_CAPTURE'; readonly permille: bigint }
   | { readonly kind: 'ACCEPT_CANCEL' }
-  | { readonly kind: 'ACCEPT_REFUND'; readonly amount: bigint }
+  | { readonly kind: 'ACCEPT_REFUND'; readonly permille: bigint }
+  /**
+   * Drives the oldest open operation one step: release a scheduled retry, claim a requested one, or
+   * resolve a claimed one with the operation's exact amount. Rewritten to the concrete action before
+   * it runs, so every oracle below sees an ordinary action.
+   */
+  | { readonly kind: 'ADVANCE'; readonly outcome: 'SUCCEEDED' | 'REJECTED' | 'FAILED' }
   | { readonly kind: 'CLAIM'; readonly index: number }
   | { readonly kind: 'RETRY'; readonly index: number }
   | { readonly kind: 'RELEASE'; readonly index: number }
@@ -143,10 +159,14 @@ function step(model: Model, action: Action, policy: FeePolicyInputs): StepResult
           : action.kind === 'ACCEPT_CANCEL'
             ? ({ type: 'CANCEL' } as const)
             : action.kind === 'ACCEPT_CAPTURE'
-              ? ({ type: 'CAPTURE', amount: U(action.amount), feePolicy: policy } as const)
+              ? ({
+                  type: 'CAPTURE',
+                  amount: relativeAmount(captureBase(payment), action.permille),
+                  feePolicy: policy,
+                } as const)
               : ({
                   type: 'REFUND',
-                  amount: U(action.amount),
+                  amount: relativeAmount(refundBase(payment), action.permille),
                   captureFeeSnapshot: snapshotOf(ops),
                 } as const);
 
@@ -267,6 +287,111 @@ function step(model: Model, action: Action, policy: FeePolicyInputs): StepResult
   }
 }
 
+function relativeAmount(base: bigint, permille: bigint): MinorUnits {
+  const amount = (base * permille) / 1000n;
+  return U(amount < 1n ? 1n : amount);
+}
+
+/** Capture against the authorization once there is one; before that, the request. */
+function captureBase(payment: PaymentState): bigint {
+  return payment.authorized > 0n ? payment.authorized : payment.requested;
+}
+
+/** Refund against what is still refundable; with nothing left, the capture (so it overshoots). */
+function refundBase(payment: PaymentState): bigint {
+  const refundable = payment.captured - payment.refunded - payment.reservedRefund;
+  if (refundable > 0n) return refundable;
+  return payment.captured > 0n ? payment.captured : payment.requested;
+}
+
+/** Rewrites ADVANCE into the concrete action it stands for; every other action is unchanged. */
+function concretize(model: Model, action: Action): Action {
+  if (action.kind !== 'ADVANCE') return action;
+  const index = model.ops.findIndex((operation) => terminalOutcomeOf(operation) === undefined);
+  // Nothing open: an index past the end, so CLAIM is a rejected no-op.
+  if (index === -1) return { kind: 'CLAIM', index: model.ops.length };
+  const target = model.ops[index] as OperationState;
+  if (target.status === 'REQUESTED') {
+    return target.notBefore === null ? { kind: 'CLAIM', index } : { kind: 'RELEASE', index };
+  }
+  return { kind: 'RESOLVE', index, outcome: action.outcome, delta: 0n };
+}
+
+/**
+ * An oracle independent of `checkPaymentInvariants`: the aggregate recomputed from the operation
+ * rows, the way the 0260 database trigger does. Asserting only through the checker under test would
+ * let a weakened checker pass its own property.
+ */
+function expectAggregateMatchesOperations(model: Model, policy: FeePolicyInputs): void {
+  const { payment, ops } = model;
+  const of = (type: OperationState['type']) => ops.filter((operation) => operation.type === type);
+  const succeeded = (list: readonly OperationState[]) =>
+    list.filter((operation) => operation.status === 'SUCCEEDED');
+  const open = (list: readonly OperationState[]) =>
+    list.filter((operation) => isUnresolved(operation.status));
+  const sum = (list: readonly OperationState[]) =>
+    list.reduce((total, operation) => total + operation.amount, 0n);
+
+  const authorizations = of('AUTHORIZE');
+  const authorized = succeeded(authorizations)[0];
+  const capture = succeeded(of('CAPTURE'))[0];
+  const cancelled = succeeded(of('CANCEL')).length > 0;
+  const openRefunds = open(of('REFUND'));
+  const openExclusive = ops.filter(
+    (operation) => operation.type !== 'REFUND' && isUnresolved(operation.status),
+  );
+
+  expect(payment.reservedRefund).toBe(sum(openRefunds));
+  expect(payment.unresolvedRefundCount).toBe(openRefunds.length);
+  expect(payment.refunded).toBe(sum(succeeded(of('REFUND'))));
+  expect(payment.captured).toBe(capture?.amount ?? 0n);
+  expect(payment.authorized).toBe(authorized?.amount ?? 0n);
+  expect(payment.activeExclusiveOperationId).toBe(openExclusive[0]?.id ?? null);
+  expect(openExclusive.length).toBeLessThanOrEqual(1);
+
+  // docs/03 §MVP policy decisions: at most three attempts, none open beside a success.
+  expect(authorizations.length).toBeLessThanOrEqual(3);
+  if (authorized !== undefined) expect(open(authorizations)).toHaveLength(0);
+
+  // docs/03 §Authorization outcomes: REJECTED declines, FAILED changes nothing.
+  if (cancelled) {
+    expect(payment.authorizationOutcome).toBe('CANCELED');
+  } else if (authorized !== undefined) {
+    expect(['AUTHORIZED', 'EXPIRED']).toContain(payment.authorizationOutcome);
+  } else {
+    const declined = authorizations.some((operation) => operation.status === 'REJECTED');
+    expect(payment.authorizationOutcome).toBe(declined ? 'DECLINED' : 'NOT_REQUESTED');
+  }
+
+  const released =
+    payment.authorizationOutcome === 'CANCELED' || payment.authorizationOutcome === 'EXPIRED';
+  expect(payment.voided).toBe(
+    capture !== undefined
+      ? payment.authorized - capture.amount
+      : released
+        ? payment.authorized
+        : 0n,
+  );
+  expect(payment.refunded + payment.reservedRefund).toBeLessThanOrEqual(payment.captured);
+
+  // A capture's fee is the formula over its snapshot, and no capture below the policy minimum is
+  // ever accepted (docs/02 §Minimum capture amount); refunds never reverse more than the fee.
+  for (const operation of of('CAPTURE')) {
+    expect(operation.amount).toBeGreaterThanOrEqual(policy.minimumCaptureAmount);
+    const snapshot = operation.feeSnapshot;
+    expect(snapshot).not.toBeNull();
+    if (snapshot === null) continue;
+    expect(operation.feeEffect).toBe(
+      computeCaptureFee(operation.amount, snapshot.basisPoints, snapshot.fixedAmount),
+    );
+  }
+  const reversed = succeeded(of('REFUND')).reduce(
+    (total, operation) => total + (operation.feeEffect ?? 0n),
+    0n,
+  );
+  expect(reversed).toBeLessThanOrEqual(capture?.feeEffect ?? 0n);
+}
+
 function terminalOutcomeOf(
   operation: OperationState,
 ): 'SUCCEEDED' | 'REJECTED' | 'FAILED' | undefined {
@@ -284,44 +409,115 @@ function snapshotOf(ops: readonly OperationState[]): FeeSnapshot | null {
   return capture?.feeSnapshot ?? null;
 }
 
-function actionArb(maxAmount: bigint): fc.Arbitrary<Action> {
-  const amount = fc.bigInt({ min: 1n, max: maxAmount });
+const OUTCOME = fc.constantFrom('SUCCEEDED' as const, 'REJECTED' as const, 'FAILED' as const);
+
+/**
+ * Weighted so a walk reaches every phase. ADVANCE is the most likely action and resolves SUCCEEDED
+ * most of the time; the other actions keep their chance of being invalid at any point.
+ */
+function actionArb(): fc.Arbitrary<Action> {
+  // Exactly 1000 (the whole authorized or refundable amount) is common, so full captures and
+  // full refunds happen; the rest spans partial and over-limit requests.
+  const permille = fc.oneof(
+    { weight: 2, arbitrary: fc.constant(1000n) },
+    { weight: 3, arbitrary: fc.bigInt({ min: 1n, max: 1100n }) },
+  );
   const index = fc.nat({ max: 8 });
 
   return fc.oneof(
-    fc.constant<Action>({ kind: 'ACCEPT_AUTHORIZE' }),
-    amount.map<Action>((value) => ({ kind: 'ACCEPT_CAPTURE', amount: value })),
-    fc.constant<Action>({ kind: 'ACCEPT_CANCEL' }),
-    amount.map<Action>((value) => ({ kind: 'ACCEPT_REFUND', amount: value })),
-    index.map<Action>((value) => ({ kind: 'CLAIM', index: value })),
-    index.map<Action>((value) => ({ kind: 'RETRY', index: value })),
-    index.map<Action>((value) => ({ kind: 'RELEASE', index: value })),
-    index.map<Action>((value) => ({ kind: 'MARK_UNKNOWN', index: value })),
-    index.map<Action>((value) => ({ kind: 'REQUIRE_REVIEW', index: value })),
-    fc
-      .record({
-        index,
-        outcome: fc.constantFrom('SUCCEEDED' as const, 'REJECTED' as const, 'FAILED' as const),
-        delta: fc.bigInt({ min: 0n, max: 1n }),
-      })
-      .map<Action>((value) => ({ kind: 'RESOLVE', ...value })),
-    fc.constant<Action>({ kind: 'EXPIRE' }),
-    index.map<Action>((value) => ({ kind: 'DUPLICATE', index: value })),
+    {
+      weight: 10,
+      arbitrary: fc
+        .oneof(
+          { weight: 4, arbitrary: fc.constant('SUCCEEDED' as const) },
+          { weight: 1, arbitrary: OUTCOME },
+        )
+        .map<Action>((outcome) => ({ kind: 'ADVANCE', outcome })),
+    },
+    { weight: 3, arbitrary: fc.constant<Action>({ kind: 'ACCEPT_AUTHORIZE' }) },
+    {
+      weight: 3,
+      arbitrary: permille.map<Action>((value) => ({ kind: 'ACCEPT_CAPTURE', permille: value })),
+    },
+    { weight: 1, arbitrary: fc.constant<Action>({ kind: 'ACCEPT_CANCEL' }) },
+    {
+      weight: 4,
+      arbitrary: permille.map<Action>((value) => ({ kind: 'ACCEPT_REFUND', permille: value })),
+    },
+    { weight: 1, arbitrary: index.map<Action>((value) => ({ kind: 'CLAIM', index: value })) },
+    { weight: 1, arbitrary: index.map<Action>((value) => ({ kind: 'RETRY', index: value })) },
+    { weight: 1, arbitrary: index.map<Action>((value) => ({ kind: 'RELEASE', index: value })) },
+    {
+      weight: 1,
+      arbitrary: index.map<Action>((value) => ({ kind: 'MARK_UNKNOWN', index: value })),
+    },
+    {
+      weight: 1,
+      arbitrary: index.map<Action>((value) => ({ kind: 'REQUIRE_REVIEW', index: value })),
+    },
+    {
+      weight: 1,
+      arbitrary: fc
+        .record({ index, outcome: OUTCOME, delta: fc.bigInt({ min: 0n, max: 1n }) })
+        .map<Action>((value) => ({ kind: 'RESOLVE', ...value })),
+    },
+    { weight: 1, arbitrary: fc.constant<Action>({ kind: 'EXPIRE' }) },
+    { weight: 1, arbitrary: index.map<Action>((value) => ({ kind: 'DUPLICATE', index: value })) },
   );
 }
 
+/**
+ * A policy the database would accept (`checkFeePolicy` mirrors `fee_policies_fee_within_minimum`):
+ * the minimum is raised until the fee charged at it fits inside it. The original generator used
+ * `minimum = fixed`, which admits unpriceable policies whose captures fail as an internal error.
+ */
 function policyArb(): fc.Arbitrary<FeePolicyInputs> {
   return fc
     .record({
-      basisPoints: fc.bigInt({ min: 0n, max: 10000n }),
+      basisPoints: fc.bigInt({ min: 0n, max: 9000n }),
       fixed: fc.bigInt({ min: 0n, max: 1000n }),
     })
-    .map(({ basisPoints, fixed }) => ({
-      basisPoints,
-      fixedAmount: U(fixed),
-      // The documented policy floor: the minimum must cover the fixed component.
-      minimumCaptureAmount: U(fixed > 0n ? fixed : 1n),
-    }));
+    .map(({ basisPoints, fixed }) => {
+      // m - floor((m*bp + 5000)/10000) >= fixed  ⇐  m >= (fixed + 1) * 10000 / (10000 - bp)
+      let minimum = ((fixed + 1n) * 10000n) / (10000n - basisPoints) + 1n;
+      while (
+        !checkFeePolicy({
+          basisPoints,
+          fixedAmount: U(fixed),
+          minimumCaptureAmount: U(minimum),
+        }).ok
+      ) {
+        minimum += 1n;
+      }
+      return { basisPoints, fixedAmount: U(fixed), minimumCaptureAmount: U(minimum) };
+    });
+}
+
+/** Runs one walk, asserting every per-step oracle, and returns the final model. */
+function walk(requested: MinorUnits, policy: FeePolicyInputs, actions: readonly Action[]): Model {
+  let model: Model = { payment: createdPayment(requested), ops: [] };
+
+  for (const generated of actions) {
+    const before = model;
+    const action = concretize(before, generated);
+    const result = step(before, action, policy);
+
+    if (!result.ok) {
+      // A rejected action is a complete no-op: no operation, no version change.
+      expect(result.model).toBe(before);
+    }
+
+    const paymentDelta = result.model.payment.version - before.payment.version;
+    expect(paymentDelta).toBe(expectedPaymentDelta(action, result.ok, result.resolutionKind));
+
+    // Every intermediate state must be consistent, not just the final one — by the checker under
+    // test and by the independent recomputation.
+    expect(checkPaymentInvariants(result.model.payment, result.model.ops)).toEqual([]);
+    expectAggregateMatchesOperations(result.model, policy);
+
+    model = result.model;
+  }
+  return model;
 }
 
 describe('model-based lifecycle properties', () => {
@@ -330,55 +526,9 @@ describe('model-based lifecycle properties', () => {
       fc.property(
         fc.bigInt({ min: 1n, max: 1000000n }),
         policyArb(),
-        fc.array(actionArb(1000000n), { minLength: 1, maxLength: 60 }),
+        fc.array(actionArb(), { minLength: 1, maxLength: 60, size: 'max' }),
         (requested, policy, actions) => {
-          let model: Model = { payment: createdPayment(U(requested)), ops: [] };
-
-          for (const action of actions) {
-            const before = model;
-            const result = step(before, action, policy);
-
-            if (!result.ok) {
-              // A rejected action is a complete no-op: no operation, no version change.
-              expect(result.model.payment).toEqual(before.payment);
-              expect(result.model.ops).toEqual(before.ops);
-            }
-
-            const paymentDelta = result.model.payment.version - before.payment.version;
-            expect(paymentDelta).toBe(
-              expectedPaymentDelta(action, result.ok, result.resolutionKind),
-            );
-
-            // Every intermediate state must be consistent, not just the final one.
-            expect(checkPaymentInvariants(result.model.payment, result.model.ops)).toEqual([]);
-            expect(
-              result.model.ops.filter(
-                (operation) => operation.type !== 'REFUND' && isUnresolved(operation.status),
-              ).length,
-            ).toBeLessThanOrEqual(1);
-
-            model = result.model;
-          }
-        },
-      ),
-    );
-  });
-
-  it('invalid actions are no-ops', () => {
-    fc.assert(
-      fc.property(
-        policyArb(),
-        fc.array(actionArb(1000n), { minLength: 1, maxLength: 30 }),
-        (policy, actions) => {
-          let model: Model = { payment: createdPayment(U('10000')), ops: [] };
-          for (const action of actions) {
-            const result = step(model, action, policy);
-            if (!result.ok) {
-              expect(result.model).toBe(model);
-              expect(result.model.payment.version).toBe(model.payment.version);
-            }
-            model = result.model;
-          }
+          walk(U(requested), policy, actions);
         },
       ),
     );
@@ -388,16 +538,14 @@ describe('model-based lifecycle properties', () => {
     fc.assert(
       fc.property(
         policyArb(),
-        fc.array(actionArb(100000n), { minLength: 1, maxLength: 60 }),
+        fc.array(actionArb(), { minLength: 1, maxLength: 80, size: 'max' }),
         (policy, actions) => {
-          let model: Model = { payment: createdPayment(U('100000')), ops: [] };
-          for (const action of actions) model = step(model, action, policy).model;
+          const model = walk(U('100000'), policy, actions);
 
           const capture = model.ops.find(
             (operation) => operation.type === 'CAPTURE' && operation.status === 'SUCCEEDED',
           );
           const captureFee = capture?.feeEffect ?? U(0n);
-
           const reversed = model.ops
             .filter((operation) => operation.type === 'REFUND' && operation.status === 'SUCCEEDED')
             .reduce((sum, operation) => sum + (operation.feeEffect ?? 0n), 0n);
@@ -409,6 +557,51 @@ describe('model-based lifecycle properties', () => {
         },
       ),
     );
+  });
+
+  /**
+   * The walk is only evidence if it reaches the states the guards protect. The P02 review measured
+   * the previous generator: 0 of 100 walks reached a successful authorization and 0 of 2000 a
+   * capture, so every capture and refund guard could be deleted without a failure. This pins the
+   * reach on a fixed seed so a generator change cannot silently make the properties vacuous again.
+   */
+  it('reaches every lifecycle phase in a meaningful share of walks', () => {
+    const samples = fc.sample(
+      fc.tuple(
+        fc.bigInt({ min: 1n, max: 1000000n }),
+        policyArb(),
+        fc.array(actionArb(), { minLength: 1, maxLength: 60, size: 'max' }),
+      ),
+      { numRuns: 300, seed: 20261109 },
+    );
+    const reached = {
+      authorized: 0,
+      captured: 0,
+      refundAccepted: 0,
+      refunded: 0,
+      fullyRefunded: 0,
+    };
+    for (const [requested, policy, actions] of samples) {
+      const model = walk(U(requested), policy, actions);
+      const has = (type: string, status?: string) =>
+        model.ops.some(
+          (operation) =>
+            operation.type === type && (status === undefined || operation.status === status),
+        );
+      if (has('AUTHORIZE', 'SUCCEEDED')) reached.authorized += 1;
+      if (has('CAPTURE', 'SUCCEEDED')) reached.captured += 1;
+      if (has('REFUND')) reached.refundAccepted += 1;
+      if (has('REFUND', 'SUCCEEDED')) reached.refunded += 1;
+      if (model.payment.captured > 0n && model.payment.refunded === model.payment.captured) {
+        reached.fullyRefunded += 1;
+      }
+    }
+    // Measured on this seed at 209 / 64 / 48 / 32 / 21 of 300; the floors sit at about 60 % of that.
+    expect(reached.authorized).toBeGreaterThan(120);
+    expect(reached.captured).toBeGreaterThan(35);
+    expect(reached.refundAccepted).toBeGreaterThan(25);
+    expect(reached.refunded).toBeGreaterThan(15);
+    expect(reached.fullyRefunded).toBeGreaterThan(8);
   });
 });
 
@@ -470,6 +663,8 @@ describe('targeted properties', () => {
             { type: 'REFUND', amount: U(first), captureFeeSnapshot: snapshot },
             freshId(),
           );
+          // `first` is at most the captured amount, so it always fits.
+          expect(accepted.ok).toBe(true);
           if (!accepted.ok) return;
 
           const raced = acceptCommand(
@@ -478,7 +673,10 @@ describe('targeted properties', () => {
             { type: 'REFUND', amount: U(second), captureFeeSnapshot: snapshot },
             freshId(),
           );
-          if (raced.ok) return; // `second` may still fit when `first` was small
+          // first + second = captured + 1, so the second can never fit. The previous `if (raced.ok)
+          // return` made the property pass vacuously with the refund guard removed.
+          expect(raced.ok).toBe(false);
+          if (raced.ok) return;
           expect(`${raced.error.code}/${raced.error.reason}`).toBe(
             'MONETARY_GUARD_FAILED/REFUND_EXCEEDS_REFUNDABLE',
           );
