@@ -2202,10 +2202,10 @@ Tests added: test/integration/ledger/accounts.test.ts (37)
 Commands: scripts/verify-task.mjs --full -> check 0, build 0, integration 499/499, e2e 0
   pnpm verify:ledger -> not yet available (created by P03-T11)
 Deviations from the task text: none in the schema. Two findings:
-  1. `accounts_owner_type` is unreachable on its own. Every logical code begins `platform.` or
-     `merchant.`, so a bogus owner type always trips `accounts_logical_code_owner` first (CHECKs are
-     evaluated in alphabetical name order). The test asserts the constraint that actually fires and
-     records the subsumption rather than pretending otherwise.
+  1. ~~`accounts_owner_type` is unreachable on its own.~~ **Corrected in review (P03-REVIEW-1):** false.
+     A bogus type like `BANK` does trip `accounts_logical_code_owner` first (CHECKs run in name order),
+     but `lower(owner_type)` lets `Platform` with `platform.x` pass every earlier check, and only
+     `accounts_owner_type` rejects it. Dropping the constraint made the new `Platform` case fail.
   2. The balance no-mutation guard needed its own function. A statement-level TRUNCATE trigger has no
      NEW/OLD, so reusing the UPDATE guard made the truncate succeed silently — the break for it is what
      exposed this, and it is why the split exists.

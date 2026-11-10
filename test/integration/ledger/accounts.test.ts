@@ -179,13 +179,18 @@ async function attempt(
 describe('constraint negatives', () => {
   it.each<[string, AccountOverrides, string]>([
     ['a malformed id', { id: 'lac_not-a-ulid' }, 'accounts_id_format'],
-    // `accounts_owner_type` cannot be reached on its own: every logical code starts `platform.` or
-    // `merchant.`, so a bogus owner type trips `accounts_logical_code_owner` first. This asserts the
-    // constraint that actually fires and records the subsumption.
+    // A bogus owner type such as 'BANK' trips `accounts_logical_code_owner` first (CHECKs run in name
+    // order), but `accounts_owner_type` is not subsumed: `lower()` lets a mixed-case 'Platform' pass the
+    // prefix check, and only `accounts_owner_type` rejects it.
     [
       'an owner type outside the class',
       { ownerType: 'BANK', bucketIndex: null, bucketCount: null },
       'accounts_logical_code_owner',
+    ],
+    [
+      'a mixed-case owner type',
+      { ownerType: 'Platform', bucketIndex: null, bucketCount: null },
+      'accounts_owner_type',
     ],
     [
       'a merchant account without an owner',
